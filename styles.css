@@ -1,0 +1,38 @@
+:root {
+    --correct: #6aaa64;
+    --present: #c9b458;
+    --absent: #787c7e;
+    --border: #3a3a3c;
+}
+
+body { background: #121213; color: white; font-family: sans-serif; display: flex; justify-content: center; }
+.screen { display: flex; flex-direction: column; align-items: center; margin-top: 50px; }
+.hidden { display: none; }
+
+/* Анимация переворота плитки */
+@keyframes flip {
+    0% { transform: rotateX(0); }
+    50% { transform: rotateX(90deg); }
+    100% { transform: rotateX(0); }
+}
+
+/* Анимация тряски при ошибке */
+@keyframes shake {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+.tile {
+    width: 50px; height: 50px;
+    border: 2px solid var(--border);
+    display: flex; justify-content: center; align-items: center;
+    font-size: 2rem; font-weight: bold; text-transform: uppercase;
+    margin: 3px;
+}
+
+.tile.flip { animation: flip 0.6s ease; }
+.shake { animation: shake 0.5s; }
+
+.row { display: flex; }

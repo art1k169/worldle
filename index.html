@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Neon Wordle Elite</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        :root {
+            --bg: #050505; --glass: rgba(255, 255, 255, 0.05); --border: rgba(255, 255, 255, 0.1);
+            --correct: #4ade80; --present: #fbbf24; --absent: #3f3f46; --primary: #7c3aed;
+        }
+        body { background: var(--bg); color: #fff; font-family: 'Inter', sans-serif; margin: 0; height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .bg-animate { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #050505 100%); }
+        .blob { position: absolute; width: 500px; height: 500px; background: var(--primary); filter: blur(80px); opacity: 0.15; border-radius: 50%; animation: move 20s infinite alternate; }
+        @keyframes move { from { transform: translate(-20%, -20%); } to { transform: translate(20%, 20%); } }
+        
+        .screen { position: absolute; width: 380px; padding: 2.5rem; background: var(--glass); backdrop-filter: blur(25px); border-radius: 30px; border: 1px solid var(--border); display: none; flex-direction: column; align-items: center; box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
+        .active { display: flex; animation: fadeIn 0.3s ease; }
+        
+        input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 12px; border: 1px solid var(--border); background: rgba(0,0,0,0.5); color: #fff; text-align: center; outline: none; font-size: 1rem; }
+        button { width: 100%; padding: 14px; border-radius: 12px; border: none; background: linear-gradient(90deg, #3b82f6, #7c3aed); color: #fff; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+        button:hover { opacity: 0.9; transform: translateY(-2px); }
+        .btn-exit { background: #ef4444 !important; }
+        
+        #board { display: grid; gap: 8px; margin-top: 20px; }
+        .row { display: flex; gap: 8px; }
+        .tile { width: 50px; height: 50px; border: 2px solid var(--border); border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 1.5rem; font-weight: bold; text-transform: uppercase; transition: 0.3s; background: rgba(255,255,255,0.02); }
+        
+        .flip { transform: rotateX(90deg); }
+        .correct { background: var(--correct) !important; border-color: var(--correct) !important; color: #000; }
+        .present { background: var(--present) !important; border-color: var(--present) !important; color: #000; }
+        .absent { background: var(--absent) !important; border-color: var(--absent) !important; }
+
+        .stats-top { position: fixed; top: 20px; left: 20px; display: flex; gap: 15px; z-index: 10; }
+        .stat-item { background: var(--glass); padding: 8px 15px; border-radius: 12px; border: 1px solid var(--border); font-size: 0.9rem; backdrop-filter: blur(10px); }
+        #game-status { font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; color: #a1a1aa; text-align: center; }
+
+        /* Кнопки финала */
+        #post-game-actions { display: none; margin-top: 25px; width: 100%; gap: 10px; justify-content: center; }
+    </style>
+</head>
+<body>
+
+    <div class="bg-animate"><div class="blob"></div></div>
+
+    <div class="stats-top">
+        <div class="stat-item">👤 <span id="stat-nick">-</span></div>
+        <div class="stat-item" style="color:#fbbf24">🏆 <span id="stat-score">0</span></div>
+    </div>
+
+    <div id="sc-auth" class="screen active">
+        <h1>Neon Wordle</h1>
+        <input type="text" id="nick" placeholder="Ваш никнейм" autocomplete="off">
+        <button onclick="create()">Создать комнату</button>
+        <div style="margin: 15px 0; color: #555">ИЛИ</div>
+        <input type="text" id="code-in" placeholder="Код комнаты" autocomplete="off">
+        <button style="background: #27272a" onclick="join()">Войти по коду</button>
+    </div>
+
+    <div id="sc-lobby" class="screen">
+        <h2>КОМНАТА</h2>
+        <h1 id="r-code" style="color:var(--primary); margin: 10px 0; font-size: 2.5rem; text-shadow: 0 0 20px var(--primary);">---</h1>
+        <div style="width:100%; text-align:left; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 15px; border: 1px solid var(--border);">
+            <p id="p1">👤 Ожидание...</p>
+            <p id="p2">👤 Ожидание...</p>
+        </div>
+        <button id="start-btn" style="display:none; margin-top:20px" onclick="start()">НАЧАТЬ ИГРУ</button>
+        <button class="btn-exit" style="margin-top:20px" onclick="leave()">ВЫЙТИ В МЕНЮ</button>
+    </div>
+
+    <div id="sc-game" class="screen">
+        <div id="game-status">ОЖИДАНИЕ...</div>
+        <div id="m-area" style="display:none; width:100%">
+            <input type="text" id="s-word" maxlength="5" placeholder="Введите 5 букв" autocomplete="off">
+            <button onclick="sendS()">ЗАГАДАТЬ</button>
+        </div>
+        <div id="board"></div>
+        
+        <div id="post-game-actions">
+            <button onclick="leave()" class="btn-exit" style="flex: 1; margin:0">В МЕНЮ</button>
+            <button onclick="backToLobby()" style="flex: 1; margin:0">В ЛОББИ</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let curRoom = "", myRole = "", curRow = 0, curTile = 0;
+        let gameActive = false;
+        let isSubmitting = false;
+
+        let userData = JSON.parse(localStorage.getItem('wordleStats')) || { name: '', score: 0 };
+        document.getElementById('stat-nick').innerText = userData.name || '-';
+        document.getElementById('stat-score').innerText = userData.score;
+
+        function updateStats() {
+            document.getElementById('stat-nick').innerText = userData.name;
+            document.getElementById('stat-score').innerText = userData.score;
+            localStorage.setItem('wordleStats', JSON.stringify(userData));
+        }
+
+        function show(id) { 
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); 
+            document.getElementById(id).classList.add('active'); 
+        }
+        
+        function create() { 
+            userData.name = document.getElementById('nick').value || 'Игрок';
+            updateStats();
+            socket.emit('createRoom', { name: userData.name }); 
+        }
+
+        function join() { 
+            userData.name = document.getElementById('nick').value || 'Игрок';
+            updateStats();
+            curRoom = document.getElementById('code-in').value.toUpperCase();
+            socket.emit('joinRoom', { code: curRoom, name: userData.name }); 
+        }
+
+        function leave() { 
+            socket.emit('leaveRoom', curRoom); 
+            document.getElementById('post-game-actions').style.display = 'none';
+        }
+
+        function backToLobby() {
+            document.getElementById('post-game-actions').style.display = 'none';
+            show('sc-lobby');
+        }
+
+        socket.on('leftSuccess', () => { 
+            curRoom = ""; gameActive = false;
+            window.removeEventListener('keydown', handleKey);
+            show('sc-auth'); 
+        });
+
+        function start() { socket.emit('startGame', curRoom); }
+
+        socket.on('roomCreated', d => { 
+            curRoom = d.code; 
+            document.getElementById('r-code').innerText = d.code; 
+            show('sc-lobby'); 
+            document.getElementById('start-btn').style.display='block'; 
+        });
+        
+        socket.on('playerJoined', ps => { 
+            document.getElementById('p1').innerText = "👤 " + (ps[0] ? ps[0].name : "..."); 
+            document.getElementById('p2').innerText = ps[1] ? "👤 " + ps[1].name : "👤 Ожидание...";
+        });
+
+        socket.on('initRole', d => {
+            myRole = d.role; curRow = 0; curTile = 0; 
+            isSubmitting = false; gameActive = true; 
+            document.getElementById('post-game-actions').style.display = 'none';
+            show('sc-game');
+            document.getElementById('game-status').innerText = (myRole==='master' ? "ЗАГАДАЙТЕ СЛОВО" : "ОЖИДАНИЕ СЛОВА...");
+            document.getElementById('m-area').style.display = (myRole==='master' ? 'block' : 'none');
+            initB();
+            window.removeEventListener('keydown', handleKey);
+        });
+
+        function sendS() {
+            const w = document.getElementById('s-word').value.toUpperCase();
+            if(w.length===5) { 
+                socket.emit('setSecretWord', { code: curRoom, word: w }); 
+                document.getElementById('m-area').style.display='none'; 
+                document.getElementById('game-status').innerText = "ОППОНЕНТ ОТГАДЫВАЕТ";
+            }
+        }
+
+        socket.on('wordIsReady', () => { 
+            if(myRole==='guesser') { 
+                document.getElementById('game-status').innerText = "ОТГАДЫВАЙТЕ!"; 
+                gameActive = true;
+                window.addEventListener('keydown', handleKey); 
+            }
+        });
+
+        function initB() {
+            const b = document.getElementById('board'); b.innerHTML = '';
+            for(let i=0; i<6; i++) {
+                const r = document.createElement('div'); r.className = 'row';
+                for(let j=0; j<5; j++) { 
+                    const t = document.createElement('div'); t.className = 'tile'; t.id = `t-${i}-${j}`; r.appendChild(t); 
+                }
+                b.appendChild(r);
+            }
+        }
+
+        function handleKey(e) {
+            if(!gameActive || isSubmitting) return;
+            if(e.key === 'Enter') {
+                let g = ""; for(let i=0; i<5; i++) g += document.getElementById(`t-${curRow}-${i}`).innerText;
+                if(g.length === 5) { isSubmitting = true; socket.emit('submitGuess', { code: curRoom, guess: g }); }
+            } else if(e.key === 'Backspace') {
+                if(curTile > 0) { curTile--; document.getElementById(`t-${curRow}-${curTile}`).innerText = ""; socket.emit('typeSync', { code: curRoom, row: curRow, tile: curTile, letter: "" }); }
+            } else if(e.key.length === 1 && e.key.match(/[а-яА-Яa-zA-Z]/)) {
+                if(curTile < 5) { let L = e.key.toUpperCase(); document.getElementById(`t-${curRow}-${curTile}`).innerText = L; socket.emit('typeSync', { code: curRoom, row: curRow, tile: curTile, letter: L }); curTile++; }
+            }
+        }
+
+        socket.on('typeSync', d => {
+            if(myRole === 'master' && gameActive) {
+                const t = document.getElementById(`t-${d.row}-${d.tile}`);
+                if(t) t.innerText = d.letter;
+            }
+        });
+
+        socket.on('guessResult', d => {
+            const isMe = d.senderId === socket.id;
+            
+            // ЕСЛИ УГАДАНО: Блокируем ввод СРАЗУ, до анимации
+            if(d.isWin) {
+                gameActive = false;
+                isSubmitting = true; 
+                window.removeEventListener('keydown', handleKey);
+            }
+
+            // Анимация переворота плиток
+            d.states.forEach((state, i) => {
+                setTimeout(() => {
+                    const t = document.getElementById(`t-${curRow}-${i}`);
+                    if(t) {
+                        t.classList.add('flip');
+                        setTimeout(() => { 
+                            t.innerText = d.guess[i]; 
+                            t.classList.add(state); 
+                            t.classList.remove('flip'); 
+                        }, 200);
+                    }
+                }, i * 150);
+            });
+
+            // Финал срабатывает ТОЛЬКО после того, как вся строка перевернулась
+            setTimeout(() => {
+                if(d.isWin) {
+                    // ПОБЕДА: Показываем кнопки
+                    if(isMe && myRole === 'guesser') { userData.score += 100; updateStats(); }
+                    document.getElementById('game-status').innerText = "СЛОВО УГАДАНО! 🎉";
+                    document.getElementById('post-game-actions').style.display = 'flex';
+                } else {
+                    // ЕСЛИ НЕ УГАДАЛИ:
+                    if(curRow >= 5) { 
+                        // Закончились попытки
+                        gameActive = false;
+                        document.getElementById('game-status').innerText = "ПОПЫТКИ КОНЧИЛИСЬ 💀"; 
+                        document.getElementById('post-game-actions').style.display = 'flex';
+                    } else {
+                        // К следующей строке
+                        curRow++; 
+                        curTile = 0;
+                        isSubmitting = false; 
+                    }
+                }
+            }, 1000); // Таймер анимации (150*4 + 400)
+        });
+
+        socket.on('errorMsg', m => alert(m));
+    </script>
+</body>
+</html>
