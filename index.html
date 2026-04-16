@@ -3,113 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ArtikWordle Pro</title>
+    <title>ArtikWordle Ultimate</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        :root { --bg: #ffffff; --text: #1a1a1b; --border: #d3d6da; --correct: #6aaa64; --present: #c9b458; --absent: #787c7e; --key: #d3d6da; --accent: #7c3aed; }
-        [data-theme="dark"] { --bg: #121213; --text: #ffffff; --border: #3a3a3c; --key: #818384; }
-        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; min-height: 100vh; transition: 0.3s; }
-        header { width: 100%; border-bottom: 1px solid var(--border); padding: 10px 0; text-align: center; position: relative; }
-        .screen { display: none; width: 100%; max-width: 500px; flex-direction: column; align-items: center; padding-top: 40px; }
+        :root { --bg: #121213; --text: #ffffff; --border: #3a3a3c; --correct: #6aaa64; --present: #c9b458; --absent: #787c7e; --key: #818384; --accent: #7c3aed; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; min-height: 100vh; }
+        header { width: 100%; border-bottom: 1px solid var(--border); padding: 10px 0; text-align: center; margin-bottom: 20px; }
+        .screen { display: none; width: 100%; max-width: 500px; flex-direction: column; align-items: center; }
         .active { display: flex; }
+        
         #board { display: grid; gap: 5px; margin-bottom: 20px; }
         .row { display: flex; gap: 5px; }
-        .tile { width: 50px; height: 50px; border: 2px solid var(--border); display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; text-transform: uppercase; }
-        .correct { background: var(--correct); border-color: var(--correct); color: white; }
-        .present { background: var(--present); border-color: var(--present); color: white; }
-        .absent { background: var(--absent); border-color: var(--absent); color: white; }
+        .tile { width: 52px; height: 52px; border: 2px solid var(--border); display: flex; justify-content: center; align-items: center; font-size: 26px; font-weight: bold; text-transform: uppercase; }
         
-        #keyboard { display: flex; flex-direction: column; gap: 8px; width: 95%; margin-top: 20px; }
-        .k-row { display: flex; justify-content: center; gap: 4px; }
-        .key { background: var(--key); color: var(--text); border: none; padding: 15px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; min-width: 30px; text-transform: uppercase; }
+        #keyboard { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 480px; padding: 10px; box-sizing: border-box; }
+        .k-row { display: flex; justify-content: center; gap: 4px; touch-action: manipulation; }
+        .key { background: var(--key); color: white; border: none; height: 58px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; text-transform: uppercase; flex: 1; min-width: 0; font-size: 14px; }
+        .key.wide { flex: 1.5; font-size: 18px; }
         
-        button { padding: 15px; width: 85%; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin: 5px 0; }
-        input { padding: 15px; width: 80%; margin-bottom: 10px; border: 2px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); }
-        .secret-view { margin-bottom: 10px; padding: 10px; background: var(--accent); color: white; border-radius: 5px; font-weight: bold; }
+        .correct { background: var(--correct) !important; border-color: var(--correct); }
+        .present { background: var(--present) !important; border-color: var(--present); }
+        .absent { background: var(--absent) !important; border-color: var(--absent); }
+
+        button.main-btn { padding: 15px; width: 85%; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin: 5px 0; }
+        input { padding: 15px; width: 80%; margin-bottom: 10px; border: 2px solid var(--border); border-radius: 8px; background: #272729; color: white; text-align: center; font-size: 18px; }
     </style>
 </head>
-<body data-theme="dark">
-    <header>
-        <h2>ArtikWordle</h2>
-        <div style="position:absolute; left:10px; top:15px; font-size:12px;" id="u-info">Player: Silver I</div>
-    </header>
+<body>
+    <header><h2>ArtikWordle</h2></header>
 
     <div id="sc-auth" class="screen active">
-        <button onclick="startSolo()">Одиночный режим</button>
-        <div style="margin:10px; opacity:0.5">— ИЛИ —</div>
-        <button onclick="create()">Создать комнату</button>
+        <button class="main-btn" onclick="startSolo()">Одиночный режим</button>
+        <div style="margin:15px; opacity:0.4">МУЛЬТИПЛЕЕР</div>
+        <button class="main-btn" style="background:#444" onclick="create()">Создать комнату</button>
         <input type="text" id="code-in" placeholder="Код лобби">
-        <button style="background:var(--absent)" onclick="join()">Войти по коду</button>
+        <button class="main-btn" style="background:#333" onclick="join()">Войти по коду</button>
     </div>
 
     <div id="sc-lobby" class="screen">
-        <h1 id="r-code" style="color:var(--accent)">------</h1>
-        <div id="p-list">Ожидание игроков...</div>
-        <button id="start-btn" style="display:none" onclick="socket.emit('startGame', curRoom)">Начать игру</button>
-        <button style="background:#ef4444" onclick="leave()">Выйти</button>
+        <h1 id="r-code" style="color:var(--accent); font-size: 40px; letter-spacing: 5px;">------</h1>
+        <div id="p-list" style="margin-bottom: 20px;">Ожидание игрока...</div>
+        <button id="start-btn" class="main-btn" style="display:none" onclick="socket.emit('startGame', curRoom)">Начать игру</button>
+        <button class="main-btn" style="background:#ef4444" onclick="location.reload()">Выйти</button>
     </div>
 
     <div id="sc-game" class="screen">
-        <div id="master-word" class="secret-view" style="display:none">СЛОВО: -----</div>
-        <div id="game-status"></div>
+        <div id="game-status" style="margin-bottom: 10px; font-weight: bold; color: var(--accent);"></div>
         <div id="board"></div>
         <div id="keyboard"></div>
-        <div id="m-area" style="display:none; width:100%; text-align:center">
-            <input type="text" id="s-word" maxlength="5" placeholder="Загадайте слово">
-            <button onclick="sendS()">ОК</button>
-        </div>
-        <button id="back-btn" style="display:none" onclick="location.reload()">В меню</button>
+        <button id="back-btn" class="main-btn" style="display:none; margin-top: 20px;" onclick="resetGame()">В главное меню</button>
     </div>
 
     <script>
         const socket = io("https://worldle-rcee.onrender.com");
         let curRoom = "", myRole = "", curRow = 0, curTile = 0, gameActive = false, secretWord = "";
-        const soloWords = ["АРБУЗ", "БАНАН", "ПОЕЗД", "ОКЕАН", "ЭКРАН", "КНИГА", "РУЧКА"];
+        const soloWords = ["АРБУЗ", "БАНАН", "ПОЕЗД", "ОКЕАН", "ЭКРАН", "КНИГА", "РУЧКА", "СПОРТ", "МЕТРО", "ОГОНЬ"];
 
-        function create() { socket.emit('createRoom', { name: "Игрок" }); }
-        function join() { curRoom = document.getElementById('code-in').value.toUpperCase(); socket.emit('joinRoom', { code: curRoom, name: "Гость" }); show('sc-lobby'); }
-        function leave() { socket.emit('leaveRoom', curRoom); location.reload(); }
-        function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+        // --- СИСТЕМА ВВОДА ---
+        function create() { socket.emit('createRoom', { name: "Хост" }); }
+        function join() { 
+            curRoom = document.getElementById('code-in').value.toUpperCase(); 
+            if(curRoom) { socket.emit('joinRoom', { code: curRoom, name: "Гость" }); show('sc-lobby'); }
+        }
 
-        socket.on('roomCreated', d => { curRoom = d.code; document.getElementById('r-code').innerText = d.code; document.getElementById('start-btn').style.display = 'block'; show('sc-lobby'); });
-        socket.on('playerJoined', ps => { document.getElementById('p-list').innerText = ps.map(p => "👤 " + p.name).join("\n"); });
-        socket.on('roomClosed', () => { alert("Лобби закрыто хостом"); location.reload(); });
+        socket.on('roomCreated', d => { 
+            curRoom = d.code; document.getElementById('r-code').innerText = d.code; 
+            document.getElementById('start-btn').style.display = 'block'; show('sc-lobby'); 
+        });
+
+        socket.on('playerJoined', ps => { 
+            document.getElementById('p-list').innerText = ps.length > 1 ? "Игрок подключился!" : "Ожидание игрока..."; 
+        });
+
+        socket.on('roomClosed', () => { alert("Лобби закрыто"); location.reload(); });
 
         socket.on('initRole', d => {
             myRole = d.role; show('sc-game');
-            if(myRole === 'master') {
-                document.getElementById('m-area').style.display = 'block';
-                document.getElementById('game-status').innerText = "Загадайте слово оппоненту";
-            } else {
-                document.getElementById('game-status').innerText = "Ждем слово от мастера...";
-            }
             initBoard(); initKeyboard();
-        });
-
-        function sendS() {
-            const w = document.getElementById('s-word').value.toUpperCase();
-            if(w.length === 5) {
-                socket.emit('setSecretWord', { code: curRoom, word: w });
-                document.getElementById('m-area').style.display = 'none';
-                document.getElementById('master-word').innerText = "СЛОВО: " + w;
-                document.getElementById('master-word').style.display = 'block';
-                document.getElementById('game-status').innerText = "Оппонент отгадывает...";
-            }
-        }
-
-        socket.on('wordIsReady', (d) => {
-            if(myRole === 'guesser') {
-                secretWord = d.word; gameActive = true;
-                document.getElementById('game-status').innerText = "ОТГАДЫВАЙТЕ!";
+            if(myRole === 'master') {
+                document.getElementById('game-status').innerText = "ЗАГАДАЙТЕ СЛОВО (5 БУКВ)";
+                gameActive = true;
+            } else {
+                document.getElementById('game-status').innerText = "ОППОНЕНТ ЗАГАДЫВАЕТ...";
             }
         });
 
         function startSolo() {
+            resetParams();
             myRole = 'guesser'; secretWord = soloWords[Math.floor(Math.random()*soloWords.length)];
             show('sc-game'); initBoard(); initKeyboard(); gameActive = true;
             document.getElementById('game-status').innerText = "ОДИНОЧНЫЙ РЕЖИМ";
         }
 
+        function resetParams() {
+            curRow = 0; curTile = 0; gameActive = false; secretWord = "";
+            document.getElementById('back-btn').style.display = 'none';
+        }
+
+        function resetGame() { location.reload(); }
+
+        // --- ИГРОВАЯ ЛОГИКА ---
         function initBoard() {
             const b = document.getElementById('board'); b.innerHTML = '';
             for(let i=0; i<6; i++) {
@@ -122,13 +115,19 @@
         }
 
         function initKeyboard() {
-            const keys = [['Й','Ц','У','К','Е','Н','Г','Ш','Щ','З','Х','Ъ'],['Ф','Ы','В','А','П','Р','О','Л','Д','Ж','Э'],['ВВОД','Я','Ч','С','М','И','Т','Ь','Б','Ю','⌫']];
+            const rows = [
+                ['Й','Ц','У','К','Е','Н','Г','Ш','Щ','З','Х','Ъ'],
+                ['Ф','Ы','В','А','П','Р','О','Л','Д','Ж','Э'],
+                ['ENTER','Я','Ч','С','М','И','Т','Ь','Б','Ю','DEL']
+            ];
             const kb = document.getElementById('keyboard'); kb.innerHTML = '';
-            keys.forEach(row => {
+            rows.forEach(row => {
                 const r = document.createElement('div'); r.className = 'k-row';
                 row.forEach(k => {
-                    const b = document.createElement('button'); b.className = 'key'; b.innerText = k; b.id = 'key-'+k;
-                    b.onclick = () => handleInput({key: k === '⌫' ? 'Backspace' : k === 'ВВОД' ? 'Enter' : k});
+                    const b = document.createElement('button'); b.className = 'key';
+                    if(k === 'ENTER') { b.innerHTML = '↵'; b.classList.add('wide'); b.onclick = () => handleInput({key: 'Enter'}); }
+                    else if(k === 'DEL') { b.innerHTML = '⌫'; b.classList.add('wide'); b.onclick = () => handleInput({key: 'Backspace'}); }
+                    else { b.innerText = k; b.id = 'key-'+k; b.onclick = () => handleInput({key: k}); }
                     r.appendChild(b);
                 });
                 kb.appendChild(r);
@@ -138,31 +137,41 @@
         function handleInput(e) {
             if(!gameActive) return;
             const k = e.key.toUpperCase();
-            if(k === 'ENTER' && curTile === 5) {
-                let g = "";
-                for(let i=0; i<5; i++) g += document.getElementById(`t-${curRow}-${i}`).innerText;
-                if(curRoom) socket.emit('submitGuess', { code: curRoom, guess: g });
-                else checkSolo(g);
-                gameActive = false;
-            } else if(k === 'BACKSPACE' && curTile > 0) {
-                curTile--; document.getElementById(`t-${curRow}-${curTile}`).innerText = "";
+            
+            if(k === 'ENTER') {
+                if(curTile < 5) return;
+                let word = "";
+                for(let i=0; i<5; i++) word += document.getElementById(`t-${curRow}-${i}`).innerText;
+                
+                if(myRole === 'master') {
+                    socket.emit('setSecretWord', { code: curRoom, word: word });
+                    gameActive = false;
+                    document.getElementById('game-status').innerText = "СЛОВО ОТПРАВЛЕНО. ЖДЕМ ОТВЕТА...";
+                } else {
+                    if(curRoom) socket.emit('submitGuess', { code: curRoom, guess: word });
+                    else checkSolo(word);
+                    gameActive = false;
+                }
+            } else if(k === 'BACKSPACE') {
+                if(curTile > 0) { curTile--; document.getElementById(`t-${curRow}-${curTile}`).innerText = ""; }
             } else if(curTile < 5 && k.length === 1 && /[А-ЯЁ]/.test(k)) {
-                document.getElementById(`t-${curRow}-${curTile}`).innerText = k; curTile++;
+                document.getElementById(`t-${curRow}-${curTile}`).innerText = k;
+                curTile++;
             }
         }
 
-        function updateKey(letter, state) {
-            const btn = document.getElementById('key-'+letter);
-            if(!btn) return;
-            if(state === 'correct') btn.className = 'key correct';
-            else if(state === 'present' && !btn.classList.contains('correct')) btn.className = 'key present';
-            else if(state === 'absent' && !btn.classList.contains('correct') && !btn.classList.contains('present')) btn.className = 'key absent';
-        }
+        socket.on('wordIsReady', (d) => {
+            if(myRole === 'guesser') {
+                secretWord = d.word; gameActive = true;
+                document.getElementById('game-status').innerText = "ОТГАДЫВАЙТЕ!";
+            }
+        });
 
         socket.on('guessResult', d => {
             d.states.forEach((s, i) => {
                 const t = document.getElementById(`t-${curRow}-${i}`);
-                t.classList.add(s); updateKey(d.guess[i], s);
+                t.classList.add(s);
+                updateKeyColor(d.guess[i], s);
             });
             if(d.isWin || curRow >= 5) end(d.isWin);
             else { curRow++; curTile = 0; if(myRole === 'guesser') gameActive = true; }
@@ -173,17 +182,31 @@
             const sArr = secretWord.split('');
             g.split('').forEach((c, i) => { if(c === sArr[i]) { states[i] = 'correct'; sArr[i] = null; } });
             g.split('').forEach((c, i) => { if(states[i] !== 'correct' && sArr.includes(c)) { states[i] = 'present'; sArr[sArr.indexOf(c)] = null; } });
-            states.forEach((s, i) => { document.getElementById(`t-${curRow}-${i}`).classList.add(s); updateKey(g[i], s); });
+            
+            states.forEach((s, i) => { 
+                document.getElementById(`t-${curRow}-${i}`).classList.add(s); 
+                updateKeyColor(g[i], s);
+            });
+            
             if(g === secretWord || curRow >= 5) end(g === secretWord);
             else { curRow++; curTile = 0; gameActive = true; }
         }
 
+        function updateKeyColor(letter, state) {
+            const btn = document.getElementById('key-' + letter);
+            if(!btn) return;
+            if(state === 'correct') btn.className = 'key correct';
+            else if(state === 'present' && !btn.classList.contains('correct')) btn.className = 'key present';
+            else if(state === 'absent' && !btn.classList.contains('correct') && !btn.classList.contains('present')) btn.className = 'key absent';
+        }
+
         function end(win) {
             gameActive = false;
-            document.getElementById('game-status').innerText = win ? "ПОБЕДА!" : "ПРОИГРЫШ. СЛОВО: " + (secretWord || "???");
+            document.getElementById('game-status').innerText = win ? "ПОБЕДА!" : "ПРОИГРЫШ. СЛОВО: " + secretWord;
             document.getElementById('back-btn').style.display = 'block';
         }
 
+        function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
         window.addEventListener('keydown', handleInput);
     </script>
 </body>
