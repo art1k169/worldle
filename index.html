@@ -5,41 +5,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ArtikWordle Multiplayer</title>
     <style>
-        body { background: #121213; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
-        #lobby-list { border: 1px solid #3a3a3c; width: 300px; min-height: 100px; padding: 10px; margin: 20px 0; }
-        .room-item { display: flex; justify-content: space-between; padding: 5px; border-bottom: 1px solid #3a3a3c; }
-        #chat-messages { height: 150px; overflow-y: auto; background: #272729; padding: 5px; border: 1px solid #3a3a3c; margin-bottom: 5px; text-align: left; }
-        #game-zone { display: none; text-align: center; }
+        body { background: #121213; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
+        #online-counter { position: absolute; top: 10px; right: 10px; font-size: 14px; color: #818384; }
+        #main-menu, #game-zone { width: 100%; max-width: 400px; text-align: center; }
+        #lobby-list { border: 2px solid #3a3a3c; border-radius: 8px; min-height: 150px; margin: 20px 0; padding: 10px; background: #1a1a1b; }
+        .room-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #3a3a3c; }
+        .room-item:last-child { border-bottom: none; }
+        #chat-messages { height: 200px; overflow-y: auto; background: #272729; padding: 10px; border: 1px solid #3a3a3c; margin-bottom: 10px; text-align: left; border-radius: 4px; display: flex; flex-direction: column; gap: 5px; }
         .hidden { display: none; }
-        button { cursor: pointer; background: #818384; color: white; border: none; padding: 10px; margin: 5px; border-radius: 4px; }
-        input { padding: 8px; border-radius: 4px; border: 1px solid #3a3a3c; background: #121213; color: white; }
+        button { cursor: pointer; background: #538d4e; color: white; border: none; padding: 12px 20px; margin: 5px; border-radius: 4px; font-weight: bold; font-size: 16px; }
+        button.secondary { background: #818384; }
+        input { padding: 12px; border-radius: 4px; border: 1px solid #3a3a3c; background: #121213; color: white; font-size: 16px; outline: none; }
+        input:focus { border-color: #565758; }
+        #game-status { font-size: 1.2rem; margin: 20px 0; font-weight: bold; min-height: 1.5em; }
+        .chat-row { display: flex; gap: 5px; justify-content: center; }
     </style>
 </head>
 <body>
+    <div id="online-counter">Загрузка онлайна...</div>
     <h1>ArtikWordle</h1>
-    <div id="online-counter">Онлайн: 0</div>
 
     <div id="main-menu">
-        <h3>Доступные лобби:</h3>
+        <h3>Открытые лобби</h3>
         <div id="lobby-list"></div>
-        <button onclick="createNewLobby()">Создать новое лобби</button>
+        <button onclick="createNewLobby()">Создать лобби</button>
     </div>
 
-    <div id="game-zone">
-        <h2 id="status-msg">Загадайте слово!</h2>
-        <div id="word-input-area">
-            <input type="text" id="target-word-input" maxlength="5" placeholder="5 букв...">
+    <div id="game-zone" class="hidden">
+        <div id="game-status">Ожидание загадывания...</div>
+        
+        <div id="setup-controls">
+            <input type="text" id="target-word-input" maxlength="5" placeholder="Введите 5 букв">
             <button onclick="confirmTargetWord()">Загадать</button>
         </div>
 
-        <div id="game-grid">
-            </div>
+        <div id="wordle-board" style="margin: 20px 0;"></div>
 
-        <div id="chat-box" style="width: 300px; margin: 20px auto;">
+        <div id="chat-section">
             <div id="chat-messages"></div>
-            <input type="text" id="chat-input" placeholder="Сообщение..." style="width: 70%;">
-            <button onclick="sendChatMessage()">></button>
+            <div class="chat-row">
+                <input type="text" id="chat-input" placeholder="Сообщение..." style="flex-grow: 1;">
+                <button class="secondary" onclick="sendChatMessage()">></button>
+            </div>
         </div>
+        <button class="secondary" style="margin-top: 20px;" onclick="location.reload()">Выйти в меню</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
