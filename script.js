@@ -1,111 +1,82 @@
 const socket = io();
-
 let currentRoomId = null;
-let playerName = "Игрок " + Math.floor(Math.random() * 1000);
+let myName = "Игрок_" + Math.floor(Math.random() * 1000);
 
-// --- 1. ОБЩАЯ ЛОГИКА И ОНЛАЙН ---
-
+// --- ОБНОВЛЕНИЕ ОНЛАЙНА ---
 socket.on('update_online', (count) => {
-    document.getElementById('online-counter').innerText = `Онлайн: ${count}`;
+    document.getElementById('online-counter').innerText = `Онлайн на сайте: ${count}`;
 });
 
-// Получение списка комнат
+// --- СПИСОК ЛОББИ ---
 socket.on('rooms_list', (rooms) => {
-    const listDiv = document.getElementById('rooms-list');
-    listDiv.innerHTML = '';
-
-    if (rooms.length === 0) {
-        listDiv.innerHTML = '<p>Нет активных лобби</p>';
-    }
-
+    const list = document.getElementById('lobby-list');
+    list.innerHTML = '';
+    if (rooms.length === 0) list.innerHTML = 'Пусто...';
+    
     rooms.forEach(room => {
-        const roomEl = document.createElement('div');
-        roomEl.style.padding = "5px";
-        roomEl.innerHTML = `
-            <span>Лобби: <b>${room.id}</b> ${room.hasPass ? '🔒' : '🔓'}</span>
+        const div = document.createElement('div');
+        div.className = 'room-item';
+        div.innerHTML = `
+            <span>Лобби: ${room.id} ${room.hasPass ? '🔒' : '🔓'}</span>
             <button onclick="joinLobby('${room.id}', ${room.hasPass})">Войти</button>
         `;
-        listDiv.appendChild(roomEl);
+        list.appendChild(div);
     });
 });
 
-// --- 2. УПРАВЛЕНИЕ ЛОББИ ---
-
+// --- СОЗДАНИЕ И ВХОД ---
 function createNewLobby() {
     const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
     const isPublic = confirm("Сделать лобби публичным?");
-    const password = isPublic ? prompt("Установите пароль (оставьте пустым, если не нужен)") : null;
-
+    const password = prompt("Введите пароль (если не нужен, оставьте пустым):");
+    
     socket.emit('create_room', { roomId, password, isPublic });
-    enterRoom(roomId);
+    setupRoom(roomId);
 }
 
-function joinLobby(roomId, hasPass) {
-    let password = null;
-    if (hasPass) {
-        password = prompt("Введите пароль для входа:");
-    }
-    socket.emit('join_room', { roomId, password });
+function joinLobby(id, hasPass) {
+    let pass = hasPass ? prompt("Введите пароль лобби:") : null;
+    socket.emit('join_room', { roomId: id, password: pass });
 }
 
-socket.on('join_success', (roomId) => {
-    enterRoom(roomId);
-});
+socket.on('join_success', (roomId) => setupRoom(roomId));
+socket.on('error_msg', (msg) => alert(msg));
 
-socket.on('error_msg', (msg) => {
-    alert(msg);
-});
-
-function enterRoom(roomId) {
-    currentRoomId = roomId;
-    document.getElementById('lobby-menu').style.display = 'none';
+function setupRoom(id) {
+    currentRoomId = id;
+    document.getElementById('main-menu').classList.add('hidden');
     document.getElementById('game-zone').style.display = 'block';
-    document.getElementById('status-msg').innerText = `Вы в лобби: ${roomId}. Загадайте слово!`;
 }
 
-// --- 3. ИГРОВАЯ ЛОГИКА ---
-
-// Функция отправки загаданного слова (ЛЮБОГО)
-function submitTargetWord(word) {
-    word = word.trim().toUpperCase();
-    if (word.length !== 5) {
-        alert("Слово должно быть из 5 букв!");
-        return;
-    }
-    // ВНИМАНИЕ: Проверка по словарю удалена. Можно любое слово.
-    socket.emit('set_word', { roomId: currentRoomId, word: word });
+// --- ИГРОВАЯ ЛОГИКА ---
+function confirmTargetWord() {
+    const word = document.getElementById('target-word-input').value.toUpperCase();
+    if (word.length !== 5) return alert("Нужно 5 букв!");
+    
+    // Любое слово теперь разрешено!
+    socket.emit('set_word', { roomId: currentRoomId, word });
+    document.getElementById('word-input-area').classList.add('hidden');
+    document.getElementById('status-msg').innerText = "СЛОВО ОТПРАВЛЕНО!";
 }
 
-// Обработка проигрыша (когда сервер присылает слово)
+// ВАЖНО: При проигрыше
 socket.on('end_game', (data) => {
     if (!data.success) {
-        const status = document.getElementById('status-msg');
-        status.style.color = "red";
-        status.innerText = `ПРОИГРЫШ. БЫЛО ЗАГАДАНО: ${data.word}`;
-    } else {
-        document.getElementById('status-msg').innerText = "ПОБЕДА!";
+        document.getElementById('status-msg').innerHTML = 
+            `<span style="color:#ff4d4d">ПРОИГРЫШ. СЛОВО: ${data.word}</span>`;
     }
 });
 
-// --- 4. ЧАТ ---
-
+// --- ЧАТ ---
 function sendChatMessage() {
     const input = document.getElementById('chat-input');
-    const text = input.value.trim();
-    if (text && currentRoomId) {
-        socket.emit('send_chat_msg', { 
-            roomId: currentRoomId, 
-            text: text, 
-            user: playerName 
-        });
-        input.value = '';
-    }
+    if (!input.value) return;
+    socket.emit('send_chat_msg', { roomId: currentRoomId, text: input.value, user: myName });
+    input.value = '';
 }
 
 socket.on('new_chat_msg', (data) => {
-    const chatBox = document.getElementById('chat-messages');
-    const msgDiv = document.createElement('div');
-    msgDiv.innerHTML = `<b>${data.user}:</b> ${data.text}`;
-    chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    const msgBox = document.getElementById('chat-messages');
+    msgBox.innerHTML += `<div><b>${data.user}:</b> ${data.text}</div>`;
+    msgBox.scrollTop = msgBox.scrollHeight;
 });
