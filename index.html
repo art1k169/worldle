@@ -4,34 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ArtikWordle Multiplayer</title>
-    <link rel="stylesheet" href="style.css"> </head>
+    <style>
+        body { background: #121213; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
+        #lobby-list { border: 1px solid #3a3a3c; width: 300px; min-height: 100px; padding: 10px; margin: 20px 0; }
+        .room-item { display: flex; justify-content: space-between; padding: 5px; border-bottom: 1px solid #3a3a3c; }
+        #chat-messages { height: 150px; overflow-y: auto; background: #272729; padding: 5px; border: 1px solid #3a3a3c; margin-bottom: 5px; text-align: left; }
+        #game-zone { display: none; text-align: center; }
+        .hidden { display: none; }
+        button { cursor: pointer; background: #818384; color: white; border: none; padding: 10px; margin: 5px; border-radius: 4px; }
+        input { padding: 8px; border-radius: 4px; border: 1px solid #3a3a3c; background: #121213; color: white; }
+    </style>
+</head>
 <body>
-    <div id="app">
-        <header>
-            <h1>ArtikWordle</h1>
-            <div id="online-counter">Онлайн: 0</div>
-        </header>
+    <h1>ArtikWordle</h1>
+    <div id="online-counter">Онлайн: 0</div>
 
-        <div id="lobby-menu">
-            <h2>Публичные лобби</h2>
-            <div id="rooms-list" style="border: 1px solid #ccc; min-height: 100px; margin-bottom: 10px;">
-                </div>
-            <button onclick="createNewLobby()">Создать лобби</button>
+    <div id="main-menu">
+        <h3>Доступные лобби:</h3>
+        <div id="lobby-list"></div>
+        <button onclick="createNewLobby()">Создать новое лобби</button>
+    </div>
+
+    <div id="game-zone">
+        <h2 id="status-msg">Загадайте слово!</h2>
+        <div id="word-input-area">
+            <input type="text" id="target-word-input" maxlength="5" placeholder="5 букв...">
+            <button onclick="confirmTargetWord()">Загадать</button>
         </div>
 
-        <hr>
-
-        <div id="game-zone" style="display:none;">
-            <h2 id="status-msg">Ожидание начала...</h2>
-            
-            <div id="wordle-grid">
-                </div>
-
-            <div id="chat-container" style="margin-top: 20px; border: 1px solid #555; padding: 10px;">
-                <div id="chat-messages" style="height: 150px; overflow-y: auto; background: #f9f9f9; color: #000;"></div>
-                <input type="text" id="chat-input" placeholder="Введите сообщение...">
-                <button onclick="sendChatMessage()">Отправить</button>
+        <div id="game-grid">
             </div>
+
+        <div id="chat-box" style="width: 300px; margin: 20px auto;">
+            <div id="chat-messages"></div>
+            <input type="text" id="chat-input" placeholder="Сообщение..." style="width: 70%;">
+            <button onclick="sendChatMessage()">></button>
         </div>
     </div>
 
