@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ArtikWordle XP Pro</title>
+    <title>ArtikWordle vs BOT</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         :root { --bg: #121213; --text: #ffffff; --border: #3a3a3c; --correct: #6aaa64; --present: #c9b458; --absent: #787c7e; --key: #818384; --accent: #7c3aed; }
@@ -18,10 +18,20 @@
         .screen { display: none; width: 100%; max-width: 500px; flex-direction: column; align-items: center; }
         .active { display: flex; }
         
-        #board { display: grid; gap: 5px; margin-bottom: 20px; }
+        /* Layout для игры с ботом */
+        #game-container { display: flex; gap: 20px; justify-content: center; align-items: flex-start; margin-bottom: 20px; }
+        
+        #board { display: grid; gap: 5px; }
         .row { display: flex; gap: 5px; }
         .tile { width: 52px; height: 52px; border: 2px solid var(--border); display: flex; justify-content: center; align-items: center; font-size: 26px; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
         
+        /* Мини-поле бота */
+        #bot-area { display: none; flex-direction: column; align-items: center; }
+        #bot-title { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: var(--accent); }
+        #bot-board { display: grid; gap: 3px; }
+        .bot-row { display: flex; gap: 3px; }
+        .bot-tile { width: 26px; height: 26px; border: 1px solid var(--border); display: flex; justify-content: center; align-items: center; font-size: 14px; font-weight: bold; text-transform: uppercase; }
+
         #keyboard { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 480px; padding: 10px; box-sizing: border-box; }
         .k-row { display: flex; justify-content: center; gap: 4px; }
         .key { background: var(--key); color: white; border: none; height: 58px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; text-transform: uppercase; flex: 1; font-size: 14px; }
@@ -33,9 +43,14 @@
 
         button.main-btn { padding: 15px; width: 85%; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin: 5px 0; font-size: 16px; }
         input { padding: 15px; width: 80%; margin-bottom: 10px; border: 2px solid var(--border); border-radius: 8px; background: #272729; color: white; text-align: center; font-size: 18px; }
+
+        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #ef4444; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        #toast.show { opacity: 1; }
     </style>
 </head>
 <body>
+    <div id="toast">Слова нет в словаре!</div>
+
     <div id="user-card">
         <div id="u-name">Загрузка...</div>
         <div id="u-rank">SILVER I</div>
@@ -49,6 +64,8 @@
         <button class="main-btn" onclick="saveNick()">Сохранить ник</button>
         <div style="margin:10px; opacity:0.3">———</div>
         <button class="main-btn" onclick="startSolo()">Одиночный режим</button>
+        <button class="main-btn" style="background:#f59e0b" onclick="startBotMatch()">Играть с БОТОМ</button>
+        <div style="margin:10px; opacity:0.3">———</div>
         <button class="main-btn" style="background:#444" onclick="create()">Создать комнату</button>
         <input type="text" id="code-in" placeholder="Код лобби">
         <button class="main-btn" style="background:#333" onclick="join()">Войти по коду</button>
@@ -63,18 +80,39 @@
 
     <div id="sc-game" class="screen">
         <div id="game-status" style="margin-bottom: 15px; font-weight: bold; color: var(--accent); height: 20px;"></div>
-        <div id="board"></div>
+        
+        <div id="game-container">
+            <div id="board"></div>
+            
+            <div id="bot-area">
+                <div id="bot-title">Бот Терминатор</div>
+                <div id="bot-board"></div>
+            </div>
+        </div>
+
         <div id="keyboard"></div>
-        <button id="back-btn" class="main-btn" style="display:none; margin-top: 20px;" onclick="location.reload()">В главное меню</button>
+        <button id="back-btn" class="main-btn" style="display:none; margin-top: 10px;" onclick="location.reload()">В главное меню</button>
     </div>
 
     <script>
+        // БАЗОВЫЙ СЛОВАРЬ (Сюда можно дописывать слова через запятую)
+        const DICT_STR = "АРБУЗ,БАНАН,ПОЕЗД,ОКЕАН,ЭКРАН,КНИГА,РУЧКА,СПОРТ,МЕТРО,ОГОНЬ,АБЗАЦ,АВТОР,АГЕНТ,АДРЕС,АКТЕР,АКЦИЯ,АЛЛЕЯ,АНГЕЛ,АРЕНА,БАГАЖ,БАЗАР,БАЛЕТ,БАНКА,БАРОН,БАШНЯ,БЕЛКА,БИЛЕТ,БИРЖА,БЛАГО,БЛЮДО,БОКАЛ,БОМБА,БОЧКА,БРАВО,БРЕНД,БУДКА,БУКВА,БУКЕТ,БУЛКА,БУРАН,ВАГОН,ВАННА,ВАХТА,ВЕДРО,ВЕНИК,ВЕСНА,ВЕТЕР,ВЕЧЕР,ВИДЕО,ВИЛКА,ВИРУС,ВКЛАД,ВОДКА,ВОЖДЬ,ВОКАЛ,ВОЛНА,ВОЛОС,ВОРОН,ВРАТА,ВРЕМЯ,ВЫВОД,ВЫХОД,ГАРАЖ,ГЕНИЙ,ГЕРОЙ,ГЛИНА,ГОЛОД,ГОЛОС,ГОРОД,ГОСТЬ,ГРАНЬ,ГРАФА,ГРИБЫ,ГРОЗА,ГРУДЬ,ГРЯЗЬ,ДАВКА,ДВЕРЬ,ДЕБЮТ,ДЕВИЗ,ДЕКАН,ДЕМОН,ДЖИНС,ДИЕТА,ДЛИНА,ДОБРО,ДОГМА,ДОЖДЬ,ДОЗОР,ДОМИК,ДОСКА,ДРАКА,ДРОВА,ДРОБЬ,ДУРАК,ДЫМКА,ЕВРЕЙ,ЕГЕРЬ,ЖАЖДА,ЖИВОТ,ЖИЗНЬ,ЖИРАФ,ЗАБОР,ЗАВОД,ЗАКАЗ,ЗАКАТ,ЗАКОН,ЗАМОК,ЗАПАД,ЗАПАХ,ЗАРЯД,ЗВЕРЬ,ЗДОРОВ,ЗЕМЛЯ,ЗЕФИР,ЗЕРНО,ЗЛОБА,ЗОЛОТ,ИДЕАЛ,ИКОНА,ИНДУС,ИСКРА,ИСТОК,КАБАН,КАЗАН,КАЗНА,КАКАО,КАМИН,КАНАЛ,КАНАТ,КАПЛЯ,КАПОТ,КАРТА,КАССА,КАТЕР,КАЧОК,КЕПКА,КЕФИР,КИОСК,КЛАСС,КЛЕТЬ,КОВЕР,КОГОТ,КОКОС,КОЛБА,КОЛЕС,КОЛОС,КОЛЬЕ,КОНЕЦ,КОНУС,КОПИЯ,КОПЬЕ,КОРАБ,КОРЕН,КОРМА,КОРОБ,КОСТЬ,КОТЕЛ,КОШКА,КРАЖА,КРАСА,КРЕДО,КРЕСТ,КРОВЬ,КРОНА,КРЫЛО,КРЫСА,КРЫША,КУБИК,КУБОК,КУЗНЯ,КУКЛА,КУЛАК,КУЛЬТ,КУПОЛ,КУПЕЦ,КУРАЖ,КУСОК,КУХНЯ,ЛАВКА,ЛАГЕР,ЛАДАН,ЛАЗЕР,ЛАЙКА,ЛАКЕЙ,ЛАМПА,ЛАПКА,ЛАПША,ЛАРЕЦ,ЛАСКА,ЛАСТА,ЛЕБЕД,ЛЕДОК,ЛЕНТА,ЛЕСКА,ЛИДЕР,ЛИМОН,ЛИНИЯ,ЛИНЗА,ЛИТРО,ЛОБИК,ЛОВКА,ЛОГИК,ЛОДКА,ЛОЖКА,ЛОКАЛ,ЛОКОН,ЛОПУХ,ЛОТОК,ЛУЧИК,ЛЮБОВ,МАГМА,МАГИЯ,МАЗУТ,МАЙКА,МАКЕТ,МАКСИ,МАНГО,МАНЕР,МАНИЯ,МАНКА,МАРКА,МАСКА,МАСЛО,МАССА,МАТКА,МАЧТА,МАШИН,МЕДАЛ,МЕДИК,МЕЛОК,МЕСЯЦ,МЕТАЛ,МЕТЕЛ,МЕТКА,МЕЧТА,МЕШОК,МИКРО,МИНУС,МИРАЖ,МИСКА,МОДЕЛЬ,МОЙКА,МОЛОТ,МОНАХ,МОНЕТ,МОРАЛ,МОРДА,МОРОЗ,МОРЯК,МОТИВ,МОТОР,МУЖИК,МУЗЕЙ,МУМИЯ,МУСОР,МЫШКА,МЯТЕЖ,НАБЕГ,НАБОР,НАВЕС,НАВОЗ,НАВЫК,НАЛОГ,НАМЕК,НАПОР,НАРОД,НАРЯД,НАСОС,НАУКА,НАХАЛ,НАЦИЯ,НЕБЕС,НЕДРА,НЕФТЬ,НИТКА,НОМЕР,НОРМА,НОСОК,НОТКА,НРАВЫ,ОАЗИС,ОБГОН,ОБЗОР,ОБИДА,ОБМАН,ОБМЕН,ОБРЕЗ,ОБРЯД,ОБУВЬ,ОБЪЕМ,ОБЫСК,ОВРАГ,ОГРАД,ОДЕЖД,ОЗЕРО,ОКЛАД,ОКРУГ,ОЛЕНЬ,ОЛОВО,ОПЕКА,ОПЕРА,ОПЛОТ,ОПРОС,ОПТИК,ОРБИТ,ОРГАН,ОРДЕН,ОСЕНЬ,ОСКАЛ,ОСНОВ,ОСОБА,ОТБОР,ОТВАГ,ОТВЕТ,ОТДЕЛ,ОТДЫХ,ОТКАЗ,ОТКУП,ОТЛИВ,ОТПОР,ОТРЯД,ОТСЕК,ОТЧЕТ,ОХОТА,ОХРАН,ОЧЕНЬ,ОЧЕРК,ПАВИЛ,ПАВОД,ПАКЕТ,ПАЛАЧ,ПАЛЕЦ,ПАЛКА,ПАЛЬТ,ПАНЕЛ,ПАНИК,ПАПКА,ПАРАД,ПАРИЖ,ПАРОМ,ПАРТА,ПАРУС,ПАСТА,ПАУЗА,ПАЦАН,ПАЧКА,ПЕДАЛ,ПЕКАР,ПЕКЛО,ПЕМЗА,ПЕНАЛ,ПЕНИС,ПЕНСИ,ПЕПЕЛ,ПЕРЕЦ,ПЕСНЯ,ПЕСОК,ПЕТЛЯ,ПЕТУХ,ПЕЧКА,ПЕШКА,ПИЛОТ,ПИРАТ,ПИРОГ,ПИТОН,ПИЦЦА,ПЛАКАТ,ПЛАМЯ,ПЛАТО,ПЛЕЕР,ПЛЕМЯ,ПЛЕЧО,ПЛИТА,ПЛОМБ,ПЛОТЬ,ПЛЮС,ПОВАР,ПОВОД,ПОЕЗД,ПОЖАР,ПОЗОР,ПОИСК,ПОКАЗ,ПОКОЙ,ПОЛЕТ,ПОЛИС,ПОЛОС,ПОЛЮС,ПОМЕХ,ПОМОЩ,ПОМПА,ПОНОС,ПОРОГ,ПОРОК,ПОРОХ,ПОРЧА,ПОСОЛ,ПОТОК,ПОХОД,ПОЧЕТ,ПОЧКА,ПОЧТА,ПОЭМА,ПРАВО,ПРЕСС,ПРИЕМ,ПРИНЦ,ПРОЗА,ПРОСО,ПТИЦА,ПУДРА,ПУЛЬС,ПУЛЬТ,ПУНКТ,ПУШКА,ПУШОК,ПЧЕЛА,ПШЕНО,ПЬЕСА,ПЯТАК,ПЯТКА,ПЯТНО,РАБОТ,РАДИО,РАДУГ,РАЙОН,РАКЕТ,РАМКА,РАНЕЦ,РАНКА,РЕБРО,РЕБУС,РЕЖИМ,РЕЗАК,РЕЗОН,РЕЛИГ,РЕМЕН,РЕНТГ,РЕПКА,РЕСУР,РЕТРО,РЕЧКА,РОБОТ,РОДНЯ,РОЖОК,РОЛИК,РОМАН,РОПОТ,РОТОР,РОЯЛЬ,РУБЕЖ,РУБЛЬ,РУЖЬЕ,РУКАВ,РУЛЕТ,РУПОР,РУСЛО,РУЧЕЙ,РЫБАК,РЫБКА,РЫВОК,РЫЖИК,РЫНОК,РЫЦАР,САБЛЯ,САЛАТ,САЛОН,САЛЬТ,САМЕЦ,САМКА,САНКИ,САПЕР,САПОГ,САРАЙ,САТИН,САУНА,САХАР,СВЕРХ,СВЕЧА,СВИНЬ,СВЯЗЬ,СДАЧА,СДВИГ,СЕАНС,СЕВЕР,СЕЗОН,СЕМЬЯ,СЕРИЯ,СЕТКА,СИГАР,СИРОП,СКАЗК,СКАЛА,СКАЛЬ,СКВЕР,СКЛАД,СКЛОН,СКРИП,СКУКА,СЛАВА,СЛЕЗА,СЛИВА,СЛИЗЬ,СЛОВО,СЛУГА,СЛЮНА,СМЕНА,СМЕРТ,СМЕСЬ,СМЕТА,СМОЛА,СМОТР,СМЫСЛ,СОБАК,СОБОР,СОВЕТ,СОВОК,СОКОЛ,СОЛНЦ,СОСНА,СОСУД,СОТНЯ,СТАДО,СТАЛЬ,СТАРЕ,СТАРТ,СТАТЯ,СТВОЛ,СТЕКЛ,СТЕНА,СТИЛЬ,СТОИМ,СТОЛБ,СТОПА,СТРАН,СТРАХ,СТРЕШ,СТРУЯ,СУБЪЕ,СУДАР,СУДЬБ,СУЖЕТ,СУКНО,СУМКА,СУММА,СУПЕР,СУРОК,СУТКИ,СУХАР,СФЕРА,СХЕМА,СЦЕНА,СЧАСТ,СЫНОК,СЫРОК,СЫТЫЙ,ТАБАК,ТАБЛО,ТАБУН,ТАЙГА,ТАЙНА,ТАКСИ,ТАЛАН,ТАЛОН,ТАМОЖ,ТАНЕЦ,ТАПОЧ,ТАРАН,ТАРИФ,ТВОРО,ТЕАТР,ТЕКСТ,ТЕЛЕЦ,ТЕМБР,ТЕПЛО,ТЕРЕМ,ТЕРРО,ТЕСТО,ТИРАЖ,ТИРАН,ТИТУЛ,ТКАНЬ,ТОВАР,ТОЛПА,ТОМАТ,ТОНУС,ТОПОР,ТОРЕЦ,ТОСКА,ТОЧКА,ТРАВА,ТРАКТ,ТРАНС,ТРАСС,ТРЕСТ,ТРЕТЬ,ТРЮК,ТРЯПК,ТУМАН,ТУПИК,ТУРНЕ,ТУФЛЯ,ТЫКВА,ТЯГАЧ,УБОРК,УБЫТО,УВАЖЕ,УВОЛЬ,УГОЛЬ,УГРОЗ,УДАЧА,УКЛОН,УКРОП,УКСУС,УЛИЦА,УЛЫБК,УМНИК,УНЦИЯ,УПЛАТ,УПРАВ,УРОЖА,УСАДЬ,УСИЛИ,УСЛОВ,УСЛУГ,УСПЕХ,УСТАВ,УСТЬЕ,УЧАСТ,УЧЕБА,УЩЕРБ,ФАВОРИ,ФАЗАН,ФАКЕЛ,ФАКТУ,ФАНАТ,ФАНЕРА,ФАСАД,ФАСОЛ,ФАУНА,ФАШИЗ,ФАЯНС,ФЕВРА,ФЕРМА,ФИЗИК,ФИКУС,ФИЛИА,ФИЛЬМ,ФИНАЛ,ФИНИШ,ФИРМА,ФЛАНГ,ФОКУС,ФОНТА,ФОРМА,ФОРУМ,ФОТОГ,ФРАЗА,ФРАНТ,ФРАХТ,ФРОНТ,ФРУКТ,ФУГАС,ФУНДА,ФУРАЖ,ХАБАР,ХАЛАТ,ХАМСТ,ХАРАК,ХВАСТ,ХВОСТ,ХЕРУВ,ХИМИК,ХИМИЯ,ХИТРО,ХЛОПЕ,ХЛЫСТ,ХМЕЛЬ,ХОБОТ,ХОЗЯИ,ХОККЕ,ХОЛОД,ХОЛОП,ХОРДА,ХОХОТ,ХРУСТ,ХРЯЩ,ХУДОЖ,ЦАПЛЯ,ЦАРЕВ,ЦАРСТ,ЦЕЛЛО,ЦЕЛОЕ,ЦЕМЕН,ЦЕНТР,ЦЕПОЧ,ЦЕРКО,ЦЕХОВ,ЦИНИК,ЦИТАТ,ЦИФРА,ЦОКОЛ,ЦЫГАН,ЦЫПКА,ЧАЙКА,ЧАШКА,ЧЕКОВ,ЧЕЛОВ,ЧЕРЕП,ЧЕРТА,ЧЕСНО,ЧЕСТЬ,ЧИСЛО,ЧУДАК,ЧУТЬЕ,ШАБЛО,ШАГАЗ,ШАЙБА,ШАКАЛ,ШАЛАШ,ШАПКА,ШАРИК,ШАССИ,ШАТЕР,ШАХТА,ШАШКА,ШЕПОТ,ШЕРИФ,ШЕСТЬ,ШИРМА,ШИТЬЕ,ШКОЛА,ШКУРА,ШЛАНГ,ШЛЮЗ,ШЛЯПА,ШМЕЛЬ,ШОКЕР,ШОПОТ,ШОССЕ,ШПИОН,ШПОРА,ШПРИЦ,ШТАМП,ШТОРМ,ШТРАФ,ШТРИХ,ШТУКА,ШУБКА,ШУМКА,ШУРИН,ШУРУП,ШУТКА,ЩЕНОК,ЩЕПКА,ЩЕТКА,ЭВОЛЮ,ЭГИДА,ЭГОИЗ,ЭКЗЕК,ЭКИПА,ЭКРАН,ЭЛИТА,ЭМАЛЬ,ЭМБЛЕ,ЭМИГР,ЭМОЦИ,ЭПОХА,ЭРОТИ,ЭСКИЗ,ЭСТЕТ,ЭТИКА,ЭФФЕК,ЮБИЛЕ,ЮЖАНИ,ЮНОША,ЮРИСТ,ЯБЛОК,ЯГОДА,ЯИЧКО,ЯКОРЬ,ЯМЩИК,ЯНВАР,ЯПОНЕ,ЯРЛЫК,ЯРОСТ";
+        const DICTIONARY = DICT_STR.split(',');
+
         const socket = io("https://worldle-rcee.onrender.com");
         let curRoom = "", myRole = "", curRow = 0, curTile = 0, gameActive = false, secretWord = "";
+        let botMode = false, botInterval, botRow = 0, botWords = [];
         
         const RANKS = ["SILVER I", "SILVER II", "GOLD I", "GOLD II", "PLATINUM", "DIAMOND", "MASTER"];
         let myXP = parseInt(localStorage.getItem('wordleXP')) || 0;
         let myNick = localStorage.getItem('wordleNick') || "Игрок";
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2000);
+        }
 
         function updateUI() {
             document.getElementById('u-name').innerText = myNick;
@@ -110,7 +148,7 @@
         socket.on('roomClosed', () => { location.reload(); });
 
         socket.on('initRole', d => {
-            myRole = d.role; show('sc-game');
+            myRole = d.role; botMode = false; show('sc-game');
             resetGameState();
             if(myRole === 'master') {
                 document.getElementById('game-status').innerText = "ЗАГАДАЙТЕ СЛОВО";
@@ -120,28 +158,47 @@
             }
         });
 
-        // --- ГЕЙМПЛЕЙ ---
+        // --- РЕЖИМЫ ИГРЫ ---
         function startSolo() {
-            curRoom = ""; myRole = 'guesser'; 
-            const soloWords = ["АРБУЗ", "БАНАН", "ПОЕЗД", "ОКЕАН", "ЭКРАН", "КНИГА", "РУЧКА", "СПОРТ"];
-            secretWord = soloWords[Math.floor(Math.random()*soloWords.length)];
+            curRoom = ""; botMode = false; myRole = 'guesser'; 
+            secretWord = DICTIONARY[Math.floor(Math.random() * DICTIONARY.length)];
             show('sc-game'); resetGameState();
             gameActive = true;
             document.getElementById('game-status').innerText = "ОДИНОЧНЫЙ РЕЖИМ";
         }
 
-        function resetGameState() {
-            curRow = 0; curTile = 0;
-            document.getElementById('back-btn').style.display = 'none';
-            initBoard(); initKeyboard();
+        function startBotMatch() {
+            curRoom = ""; botMode = true; myRole = 'guesser'; 
+            secretWord = DICTIONARY[Math.floor(Math.random() * DICTIONARY.length)];
+            show('sc-game'); resetGameState();
+            
+            // Настройка бота
+            document.getElementById('bot-area').style.display = 'flex';
+            botRow = 0;
+            botWords = [...DICTIONARY];
+            gameActive = true;
+            document.getElementById('game-status').innerText = "СОРЕВНОВАНИЕ С БОТОМ!";
+            
+            clearInterval(botInterval);
+            botInterval = setInterval(botTurn, 3500); // Бот ходит каждые 3.5 сек
         }
 
-        function initBoard() {
-            const b = document.getElementById('board'); b.innerHTML = '';
+        function resetGameState() {
+            curRow = 0; curTile = 0;
+            document.getElementById('bot-area').style.display = 'none';
+            document.getElementById('back-btn').style.display = 'none';
+            clearInterval(botInterval);
+            initBoard('board', 't'); initBoard('bot-board', 'bt'); initKeyboard();
+        }
+
+        function initBoard(containerId, prefix) {
+            const b = document.getElementById(containerId); b.innerHTML = '';
+            const rowClass = prefix === 't' ? 'row' : 'bot-row';
+            const tileClass = prefix === 't' ? 'tile' : 'bot-tile';
             for(let i=0; i<6; i++) {
-                const r = document.createElement('div'); r.className = 'row';
+                const r = document.createElement('div'); r.className = rowClass;
                 for(let j=0; j<5; j++) {
-                    const t = document.createElement('div'); t.className = 'tile'; t.id = `t-${i}-${j}`; r.appendChild(t);
+                    const t = document.createElement('div'); t.className = tileClass; t.id = `${prefix}-${i}-${j}`; r.appendChild(t);
                 }
                 b.appendChild(r);
             }
@@ -163,6 +220,7 @@
             });
         }
 
+        // --- ЛОГИКА ВВОДА И СЛОВАРЯ ---
         function handleInput(e) {
             if(!gameActive) return;
             const k = e.key.toUpperCase();
@@ -173,18 +231,23 @@
                     let word = "";
                     for(let i=0; i<5; i++) word += document.getElementById(`t-${curRow}-${i}`).innerText;
                     
+                    // ПРОВЕРКА ПО СЛОВАРЮ
+                    if(!DICTIONARY.includes(word)) {
+                        showToast("Слова нет в словаре!");
+                        return; // Блокируем отправку
+                    }
+                    
                     if(myRole === 'master') {
                         socket.emit('setSecretWord', { code: curRoom, word: word });
                         gameActive = false;
                         document.getElementById('game-status').innerText = "СЛОВО ОТПРАВЛЕНО!";
-                        initBoard(); // Очищаем поле для мастера
-                        curRow = 0; curTile = 0;
+                        initBoard('board', 't'); curRow = 0; curTile = 0;
                     } else {
                         if(curRoom) {
                             socket.emit('submitGuess', { code: curRoom, guess: word });
-                            gameActive = false; // Блокируем ввод пока ждем ответа сервера в мультиплеере
+                            gameActive = false;
                         } else {
-                            checkSolo(word); // В одиночном режиме сервер ждать не нужно
+                            checkLocal(word);
                         }
                     }
                 } else if(k === 'BACKSPACE') {
@@ -207,23 +270,75 @@
             d.states.forEach((s, i) => {
                 const t = document.getElementById(`t-${curRow}-${i}`);
                 t.classList.add(s);
-                // Добавлена вставка букв, чтобы мастер тоже видел введенное слово оппонента
                 if (d.guess) t.innerText = d.guess[i]; 
-                
                 if(myRole === 'guesser') updateKeyColor(d.guess[i], s);
             });
             if(d.isWin || curRow >= 5) end(d.isWin);
             else { curRow++; curTile = 0; if(myRole === 'guesser') gameActive = true; }
         });
 
-        function checkSolo(g) {
+        // --- ЛОКАЛЬНАЯ ИГРА И БОТ ---
+        function checkLocal(g) {
             const states = Array(5).fill('absent');
             const sArr = secretWord.split('');
             g.split('').forEach((c, i) => { if(c === sArr[i]) { states[i] = 'correct'; sArr[i] = null; } });
             g.split('').forEach((c, i) => { if(states[i] !== 'correct' && sArr.includes(c)) { states[i] = 'present'; sArr[sArr.indexOf(c)] = null; } });
-            states.forEach((s, i) => { document.getElementById(`t-${curRow}-${i}`).classList.add(s); updateKeyColor(g[i], s); });
-            if(g === secretWord || curRow >= 5) end(g === secretWord);
-            else { curRow++; curTile = 0; gameActive = true; } // После проверки разрешаем ввод снова
+            
+            states.forEach((s, i) => { 
+                document.getElementById(`t-${curRow}-${i}`).classList.add(s); 
+                updateKeyColor(g[i], s); 
+            });
+            
+            if(g === secretWord) end(true);
+            else if(curRow >= 5) end(false);
+            else { curRow++; curTile = 0; gameActive = true; }
+        }
+
+        function botTurn() {
+            if(!gameActive) return clearInterval(botInterval);
+            
+            // Бот выбирает случайное слово из отфильтрованного списка
+            let guess = botWords[Math.floor(Math.random() * botWords.length)] || secretWord;
+            
+            const states = Array(5).fill('absent');
+            const sArr = secretWord.split('');
+            guess.split('').forEach((c, i) => { if(c === sArr[i]) { states[i] = 'correct'; sArr[i] = null; } });
+            guess.split('').forEach((c, i) => { if(states[i] !== 'correct' && sArr.includes(c)) { states[i] = 'present'; sArr[sArr.indexOf(c)] = null; } });
+            
+            // Отрисовка на доске бота
+            states.forEach((s, i) => {
+                const bt = document.getElementById(`bt-${botRow}-${i}`);
+                bt.classList.add(s);
+                bt.innerText = guess[i];
+            });
+
+            if(guess === secretWord) {
+                end(false, "БОТ ОПЕРЕДИЛ ТЕБЯ!");
+            } else {
+                botRow++;
+                if(botRow >= 6) clearInterval(botInterval); // Бот не справился
+                else filterBotWords(guess, states); // Бот "думает"
+            }
+        }
+
+        // Логика фильтрации слов для бота
+        function filterBotWords(guess, states) {
+            botWords = botWords.filter(w => {
+                let temp = w.split('');
+                for(let i=0; i<5; i++) {
+                    if(states[i] === 'correct') { if(temp[i] !== guess[i]) return false; temp[i] = null; }
+                }
+                for(let i=0; i<5; i++) {
+                    if(states[i] === 'present') {
+                        let idx = temp.indexOf(guess[i]);
+                        if(idx === -1 || w[i] === guess[i]) return false; 
+                        temp[idx] = null;
+                    } else if(states[i] === 'absent') {
+                        if(temp.includes(guess[i])) return false;
+                    }
+                }
+                return true;
+            });
         }
 
         function updateKeyColor(letter, state) {
@@ -234,11 +349,21 @@
             else if(state === 'absent' && !btn.classList.contains('correct') && !btn.classList.contains('present')) btn.className = 'key absent';
         }
 
-        function end(win) {
+        function end(win, customText) {
             gameActive = false;
-            if(curRoom) {
-                if(win) { myXP += 100; document.getElementById('game-status').innerText = "ПОБЕДА! +100 XP"; }
-                else { myXP -= 50; if(myXP < 0) myXP = 0; document.getElementById('game-status').innerText = "ПРОИГРЫШ. СЛОВО: " + secretWord; }
+            clearInterval(botInterval);
+            
+            let xpChange = 0;
+            if(curRoom || botMode) {
+                if(win) {
+                    xpChange = curRoom ? 100 : 50; // За мультиплеер +100, за бота +50
+                    document.getElementById('game-status').innerText = `ПОБЕДА! +${xpChange} XP`; 
+                } else { 
+                    xpChange = curRoom ? -50 : -25;
+                    document.getElementById('game-status').innerText = customText || ("ПРОИГРЫШ. СЛОВО: " + secretWord); 
+                }
+                myXP += xpChange;
+                if(myXP < 0) myXP = 0;
                 updateUI();
             } else {
                 document.getElementById('game-status').innerText = win ? "ПОБЕДА!" : "ПРОИГРЫШ. СЛОВО: " + secretWord;
