@@ -1,82 +1,95 @@
-const io = require("socket.io")(server); // Твой сервер
+const express = require('express');
+const app = express();
+const http = require('http').createServer(app);
+const io = require('socket.io')(http);
 
-let rooms = {}; 
-let onlineCount = 0;
+app.use(express.static(__dirname + '/public'));
 
-io.on("connection", (socket) => {
-    onlineCount++;
-    io.emit("update_online", onlineCount); // Рассылаем онлайн всем
+let rooms = {};
+let totalConnections = 0;
 
-    // Рассылка списка комнат при подключении
+io.on('connection', (socket) => {
+    totalConnections++;
+    io.emit('update_online', totalConnections);
+    
     sendPublicRooms(socket);
 
-    // Создание лобби
-    socket.on("create_room", ({ roomId, password, isPublic }) => {
-        rooms[roomId] = {
-            id: roomId,
-            password: password || null,
-            isPublic: isPublic,
+    socket.on('create_room', (data) => {
+        rooms[data.roomId] = {
+            id: data.roomId,
+            password: data.password || null,
+            isPublic: data.isPublic,
             targetWord: null,
-            players: [socket.id],
-            gameActive: false
+            players: [socket.id]
         };
-        socket.join(roomId);
-        broadcastRooms(); 
+        socket.join(data.roomId);
+        broadcastPublicRooms();
     });
 
-    // Вход в лобби
-    socket.on("join_room", ({ roomId, password }) => {
-        const room = rooms[roomId];
-        if (room) {
-            if (room.password && room.password !== password) {
-                return socket.emit("error_msg", "Неверный пароль!");
+    socket.on('join_room', (data) => {
+        const room = rooms[data.roomId];
+        if (!room) {
+            socket.emit('error_msg', 'Лобби не найдено');
+            return;
+        }
+        if (room.password && room.password !== data.password) {
+            socket.emit('error_msg', 'Неверный пароль');
+            return;
+        }
+        socket.join(data.roomId);
+        room.players.push(socket.id);
+        socket.emit('join_success', data.roomId);
+    });
+
+    socket.on('set_word', (data) => {
+        if (rooms[data.roomId]) {
+            rooms[data.roomId].targetWord = data.word.toUpperCase();
+            io.to(data.roomId).emit('game_started');
+        }
+    });
+
+    socket.on('game_lost', (roomId) => {
+        if (rooms[roomId]) {
+            const word = rooms[roomId].targetWord;
+            io.to(roomId).emit('end_game', { success: false, word: word });
+        }
+    });
+
+    socket.on('send_chat_msg', (data) => {
+        io.to(data.roomId).emit('new_chat_msg', {
+            user: data.user,
+            text: data.text
+        });
+    });
+
+    socket.on('disconnect', () => {
+        totalConnections--;
+        io.emit('update_online', totalConnections);
+        for (let roomId in rooms) {
+            rooms[roomId].players = rooms[roomId].players.filter(id => id !== socket.id);
+            if (rooms[roomId].players.length === 0) {
+                delete rooms[roomId];
+                broadcastPublicRooms();
             }
-            socket.join(roomId);
-            socket.emit("join_success", roomId);
         }
-    });
-
-    // Загадывание слова (ЛЮБОЕ слово)
-    socket.on("set_word", ({ roomId, word }) => {
-        if (rooms[roomId]) {
-            rooms[roomId].targetWord = word.toUpperCase();
-            rooms[roomId].gameActive = true;
-            io.to(roomId).emit("game_started");
-        }
-    });
-
-    // Проигрыш (рассылка слова всем)
-    socket.on("game_lost", (roomId) => {
-        if (rooms[roomId]) {
-            io.to(roomId).emit("end_game", { 
-                success: false, 
-                word: rooms[roomId].targetWord 
-            });
-            rooms[roomId].gameActive = false;
-        }
-    });
-
-    // Чат
-    socket.on("send_chat_msg", ({ roomId, text, user }) => {
-        io.to(roomId).emit("new_chat_msg", { user, text });
-    });
-
-    socket.on("disconnect", () => {
-        onlineCount--;
-        io.emit("update_online", onlineCount);
     });
 });
 
-function broadcastRooms() {
-    const publicData = Object.values(rooms)
+function sendPublicRooms(socket) {
+    const publicList = Object.values(rooms)
         .filter(r => r.isPublic)
         .map(r => ({ id: r.id, hasPass: !!r.password }));
-    io.emit("rooms_list", publicData);
+    socket.emit('rooms_list', publicList);
 }
 
-function sendPublicRooms(socket) {
-    const publicData = Object.values(rooms)
+function broadcastPublicRooms() {
+    const publicList = Object.values(rooms)
         .filter(r => r.isPublic)
         .map(r => ({ id: r.id, hasPass: !!r.password }));
-    socket.emit("rooms_list", publicData);
+    io.emit('rooms_list', publicList);
 }
+
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => {
+    console.log('Server is running on port ' + PORT);
+});
