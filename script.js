@@ -1,78 +1,111 @@
-const express = require('express');
-const app = express();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const socket = io();
 
-app.use(express.static(__dirname));
+let currentRoomId = null;
+let playerName = "Игрок " + Math.floor(Math.random() * 1000);
 
-let rooms = {};
+// --- 1. ОБЩАЯ ЛОГИКА И ОНЛАЙН ---
 
-io.on('connection', (socket) => {
-    socket.on('createRoom', (data) => {
-        const code = Math.random().toString(36).substring(2, 7).toUpperCase();
-        rooms[code] = { players: [{ id: socket.id, name: data.name }], secretWord: null };
-        socket.join(code);
-        socket.emit('roomCreated', { code });
-    });
+socket.on('update_online', (count) => {
+    document.getElementById('online-counter').innerText = `Онлайн: ${count}`;
+});
 
-    socket.on('joinRoom', (data) => {
-        const room = rooms[data.code];
-        if (room && room.players.length < 2) {
-            room.players.push({ id: socket.id, name: data.name });
-            socket.join(data.code);
-            io.to(data.code).emit('playerJoined', room.players);
-        } else { socket.emit('errorMsg', 'Комната не найдена'); }
-    });
+// Получение списка комнат
+socket.on('rooms_list', (rooms) => {
+    const listDiv = document.getElementById('rooms-list');
+    listDiv.innerHTML = '';
 
-    // ЛОГИКА ВЫХОДА
-    socket.on('leaveRoom', (code) => {
-        socket.leave(code);
-        if (rooms[code]) {
-            rooms[code].players = rooms[code].players.filter(p => p.id !== socket.id);
-            // Если в комнате кто-то остался, обновляем список игроков
-            io.to(code).emit('playerJoined', rooms[code].players);
-            // Если комната пуста — удаляем её
-            if (rooms[code].players.length === 0) delete rooms[code];
-        }
-        socket.emit('leftSuccess');
-    });
+    if (rooms.length === 0) {
+        listDiv.innerHTML = '<p>Нет активных лобби</p>';
+    }
 
-    socket.on('startGame', (code) => {
-        const room = rooms[code];
-        if (!room) return;
-        const masterIdx = Math.floor(Math.random() * 2);
-        room.players.forEach((p, i) => {
-            io.to(p.id).emit('initRole', { role: (i === masterIdx ? 'master' : 'guesser') });
-        });
-    });
-
-    socket.on('setSecretWord', (data) => {
-        if (rooms[data.code]) {
-            rooms[data.code].secretWord = data.word.toUpperCase();
-            io.to(data.code).emit('wordIsReady');
-        }
-    });
-
-    socket.on('submitGuess', (data) => {
-        const room = rooms[data.code];
-        if (room && room.secretWord) {
-            const secret = room.secretWord;
-            const guess = data.guess.toUpperCase();
-            let res = Array(5).fill('absent');
-            let sMap = secret.split(''), gMap = guess.split('');
-
-            for (let i = 0; i < 5; i++) {
-                if (gMap[i] === sMap[i]) { res[i] = 'correct'; sMap[i] = null; gMap[i] = null; }
-            }
-            for (let i = 0; i < 5; i++) {
-                if (gMap[i] !== null && sMap.includes(gMap[i])) {
-                    res[i] = 'present'; sMap[sMap.indexOf(gMap[i])] = null;
-                }
-            }
-            const win = res.every(s => s === 'correct');
-            io.to(data.code).emit('guessResult', { guess, states: res, senderId: socket.id, isWin: win });
-        }
+    rooms.forEach(room => {
+        const roomEl = document.createElement('div');
+        roomEl.style.padding = "5px";
+        roomEl.innerHTML = `
+            <span>Лобби: <b>${room.id}</b> ${room.hasPass ? '🔒' : '🔓'}</span>
+            <button onclick="joinLobby('${room.id}', ${room.hasPass})">Войти</button>
+        `;
+        listDiv.appendChild(roomEl);
     });
 });
 
-http.listen(3000, () => console.log('Server: http://localhost:3000'));
+// --- 2. УПРАВЛЕНИЕ ЛОББИ ---
+
+function createNewLobby() {
+    const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const isPublic = confirm("Сделать лобби публичным?");
+    const password = isPublic ? prompt("Установите пароль (оставьте пустым, если не нужен)") : null;
+
+    socket.emit('create_room', { roomId, password, isPublic });
+    enterRoom(roomId);
+}
+
+function joinLobby(roomId, hasPass) {
+    let password = null;
+    if (hasPass) {
+        password = prompt("Введите пароль для входа:");
+    }
+    socket.emit('join_room', { roomId, password });
+}
+
+socket.on('join_success', (roomId) => {
+    enterRoom(roomId);
+});
+
+socket.on('error_msg', (msg) => {
+    alert(msg);
+});
+
+function enterRoom(roomId) {
+    currentRoomId = roomId;
+    document.getElementById('lobby-menu').style.display = 'none';
+    document.getElementById('game-zone').style.display = 'block';
+    document.getElementById('status-msg').innerText = `Вы в лобби: ${roomId}. Загадайте слово!`;
+}
+
+// --- 3. ИГРОВАЯ ЛОГИКА ---
+
+// Функция отправки загаданного слова (ЛЮБОГО)
+function submitTargetWord(word) {
+    word = word.trim().toUpperCase();
+    if (word.length !== 5) {
+        alert("Слово должно быть из 5 букв!");
+        return;
+    }
+    // ВНИМАНИЕ: Проверка по словарю удалена. Можно любое слово.
+    socket.emit('set_word', { roomId: currentRoomId, word: word });
+}
+
+// Обработка проигрыша (когда сервер присылает слово)
+socket.on('end_game', (data) => {
+    if (!data.success) {
+        const status = document.getElementById('status-msg');
+        status.style.color = "red";
+        status.innerText = `ПРОИГРЫШ. БЫЛО ЗАГАДАНО: ${data.word}`;
+    } else {
+        document.getElementById('status-msg').innerText = "ПОБЕДА!";
+    }
+});
+
+// --- 4. ЧАТ ---
+
+function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (text && currentRoomId) {
+        socket.emit('send_chat_msg', { 
+            roomId: currentRoomId, 
+            text: text, 
+            user: playerName 
+        });
+        input.value = '';
+    }
+}
+
+socket.on('new_chat_msg', (data) => {
+    const chatBox = document.getElementById('chat-messages');
+    const msgDiv = document.createElement('div');
+    msgDiv.innerHTML = `<b>${data.user}:</b> ${data.text}`;
+    chatBox.appendChild(msgDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+});
