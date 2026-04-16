@@ -177,12 +177,15 @@
                         socket.emit('setSecretWord', { code: curRoom, word: word });
                         gameActive = false;
                         document.getElementById('game-status').innerText = "СЛОВО ОТПРАВЛЕНО!";
-                        initBoard(); // Очищаем поле для мастера, чтобы видеть ходы оппонента
+                        initBoard(); // Очищаем поле для мастера
                         curRow = 0; curTile = 0;
                     } else {
-                        if(curRoom) socket.emit('submitGuess', { code: curRoom, guess: word });
-                        else checkSolo(word);
-                        gameActive = false;
+                        if(curRoom) {
+                            socket.emit('submitGuess', { code: curRoom, guess: word });
+                            gameActive = false; // Блокируем ввод пока ждем ответа сервера в мультиплеере
+                        } else {
+                            checkSolo(word); // В одиночном режиме сервер ждать не нужно
+                        }
                     }
                 } else if(k === 'BACKSPACE') {
                     if(curTile > 0) { curTile--; document.getElementById(`t-${curRow}-${curTile}`).innerText = ""; }
@@ -201,10 +204,12 @@
         });
 
         socket.on('guessResult', d => {
-            // Отрисовка результата (видна и мастеру, и игроку)
             d.states.forEach((s, i) => {
                 const t = document.getElementById(`t-${curRow}-${i}`);
                 t.classList.add(s);
+                // Добавлена вставка букв, чтобы мастер тоже видел введенное слово оппонента
+                if (d.guess) t.innerText = d.guess[i]; 
+                
                 if(myRole === 'guesser') updateKeyColor(d.guess[i], s);
             });
             if(d.isWin || curRow >= 5) end(d.isWin);
@@ -218,7 +223,7 @@
             g.split('').forEach((c, i) => { if(states[i] !== 'correct' && sArr.includes(c)) { states[i] = 'present'; sArr[sArr.indexOf(c)] = null; } });
             states.forEach((s, i) => { document.getElementById(`t-${curRow}-${i}`).classList.add(s); updateKeyColor(g[i], s); });
             if(g === secretWord || curRow >= 5) end(g === secretWord);
-            else { curRow++; curTile = 0; gameActive = true; }
+            else { curRow++; curTile = 0; gameActive = true; } // После проверки разрешаем ввод снова
         }
 
         function updateKeyColor(letter, state) {
@@ -243,7 +248,6 @@
 
         function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
         
-        // СЛУШАТЕЛЬ ФИЗИЧЕСКОЙ КЛАВИАТУРЫ
         window.addEventListener('keydown', (e) => {
             const activeInput = document.activeElement.tagName === 'INPUT';
             if(!activeInput) handleInput(e);
