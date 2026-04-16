@@ -7,7 +7,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
-        origin: "https://art1k169.github.io",
+        origin: "*", // Разрешаем доступ со всех доменов
         methods: ["GET", "POST"]
     }
 });
@@ -18,9 +18,8 @@ io.on('connection', (socket) => {
     socket.on('createRoom', (data) => {
         const code = Math.random().toString(36).substring(2, 8).toUpperCase();
         rooms[code] = {
-            players: [{ id: socket.id, name: data.name }],
-            secretWord: null,
-            guesses: []
+            players: [{ id: socket.id, name: data.name || 'Хост' }],
+            secretWord: null
         };
         socket.join(code);
         socket.emit('roomCreated', { code });
@@ -30,11 +29,11 @@ io.on('connection', (socket) => {
     socket.on('joinRoom', (data) => {
         const room = rooms[data.code];
         if (room && room.players.length < 2) {
-            room.players.push({ id: socket.id, name: data.name });
+            room.players.push({ id: socket.id, name: data.name || 'Гость' });
             socket.join(data.code);
             io.to(data.code).emit('playerJoined', room.players);
         } else {
-            socket.emit('errorMsg', 'Комната не найдена или заполнена');
+            socket.emit('errorMsg', 'Комната не найдена или уже полная');
         }
     });
 
@@ -54,10 +53,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('typeSync', (data) => {
-        socket.to(data.code).emit('typeSync', data);
-    });
-
     socket.on('submitGuess', (data) => {
         const room = rooms[data.code];
         if (!room || !room.secretWord) return;
@@ -66,16 +61,17 @@ io.on('connection', (socket) => {
         const secret = room.secretWord;
         const states = Array(5).fill('absent');
         const secretArr = secret.split('');
-        const guessArr = guess.split('');
 
-        guessArr.forEach((char, i) => {
+        // Проверка на точное совпадение
+        guess.split('').forEach((char, i) => {
             if (char === secretArr[i]) {
                 states[i] = 'correct';
                 secretArr[i] = null;
             }
         });
 
-        guessArr.forEach((char, i) => {
+        // Проверка на наличие в слове
+        guess.split('').forEach((char, i) => {
             if (states[i] !== 'correct' && secretArr.includes(char)) {
                 states[i] = 'present';
                 secretArr[secretArr.indexOf(char)] = null;
@@ -90,26 +86,19 @@ io.on('connection', (socket) => {
         });
     });
 
-    socket.on('leaveRoom', (code) => {
-        socket.leave(code);
-        socket.emit('leftSuccess');
-        if (rooms[code]) {
-            rooms[code].players = rooms[code].players.filter(p => p.id !== socket.id);
-            if (rooms[code].players.length === 0) delete rooms[code];
-            else io.to(code).emit('playerJoined', rooms[code].players);
-        }
-    });
-
     socket.on('disconnect', () => {
         for (const code in rooms) {
             rooms[code].players = rooms[code].players.filter(p => p.id !== socket.id);
-            if (rooms[code].players.length === 0) delete rooms[code];
-            else io.to(code).emit('playerJoined', rooms[code].players);
+            if (rooms[code].players.length === 0) {
+                delete rooms[code];
+            } else {
+                io.to(code).emit('playerJoined', rooms[code].players);
+            }
         }
     });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
