@@ -5,43 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ArtikWordle</title>
     <style>
-        body { background: #121213; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
-        .user-stats { position: absolute; top: 10px; left: 10px; text-align: left; }
-        .rank { color: #854ce6; font-weight: bold; font-size: 12px; }
-        #online-counter { position: absolute; top: 10px; right: 10px; color: #818384; font-size: 14px; }
-        h1 { margin-top: 40px; }
-        #xp-container { width: 100px; height: 4px; background: #3a3a3c; margin-top: 4px; border-radius: 2px; }
-        #xp-bar { width: 0%; height: 100%; background: #854ce6; border-radius: 2px; }
-        #game-container { text-align: center; margin-top: 20px; }
+        body { background: #121213; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px; min-height: 100vh; }
+        
+        .header-ui { position: absolute; top: 10px; width: calc(100% - 20px); display: flex; justify-content: space-between; align-items: flex-start; }
+        
+        .user-card { text-align: left; }
+        .player-name { font-weight: bold; font-size: 16px; cursor: pointer; }
+        .rank-text { color: #854ce6; font-weight: bold; font-size: 12px; margin-top: 2px; }
+        .xp-container { width: 120px; height: 5px; background: #3a3a3c; border-radius: 3px; margin-top: 5px; overflow: hidden; }
+        .xp-bar { height: 100%; background: #854ce6; transition: width 0.3s ease; }
+        
+        .online-status { color: #818384; font-size: 14px; }
+
+        .game-title { font-size: 2.5rem; font-weight: bold; margin-top: 60px; margin-bottom: 20px; letter-spacing: 2px; }
+
+        #main-menu { display: flex; flex-direction: column; gap: 15px; margin-top: 50px; }
+        .menu-btn { background: #538d4e; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: transform 0.1s; width: 250px; }
+        .menu-btn:active { transform: scale(0.98); }
+        .menu-btn.bot { background: #b59f3b; }
+
+        #game-zone { display: none; text-align: center; width: 100%; max-width: 500px; }
+        #status-text { margin-bottom: 20px; font-weight: bold; min-height: 1.2em; color: #d7dadc; }
+
         .grid { display: grid; grid-template-rows: repeat(6, 1fr); grid-template-columns: repeat(5, 1fr); gap: 5px; margin-bottom: 20px; }
         .cell { width: 60px; height: 60px; border: 2px solid #3a3a3c; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; text-transform: uppercase; }
-        #keyboard { max-width: 500px; }
-        .key-row { display: flex; justify-content: center; margin-bottom: 8px; gap: 6px; }
-        button.key { background: #818384; color: white; border: none; padding: 15px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; min-width: 30px; }
-        button.enter { min-width: 65px; background: #538d4e; }
-        button.backspace { min-width: 65px; }
+        
+        #keyboard { margin-top: 20px; width: 100%; }
+        .key-row { display: flex; justify-content: center; gap: 6px; margin-bottom: 8px; }
+        .key { background: #818384; color: white; border: none; padding: 15px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; min-width: 35px; flex: 1; text-transform: uppercase; }
+        .key.wide { flex: 1.5; background: #565758; }
+
+        .back-btn { margin-top: 30px; background: none; border: 1px solid #3a3a3c; color: #818384; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="user-stats">
-        <div id="player-name-display">Player ✏️</div>
-        <div class="rank" id="player-rank">SILVER I</div>
-        <div id="xp-container">
-            <div id="xp-bar"></div>
+    <div class="header-ui">
+        <div class="user-card">
+            <div class="player-name" id="player-name">Player ✏️</div>
+            <div class="rank-text" id="player-rank">SILVER I</div>
+            <div class="xp-container"><div class="xp-bar" id="xp-bar" style="width: 0%"></div></div>
         </div>
+        <div class="online-status" id="online-count">Онлайн: 0</div>
     </div>
 
-    <div id="online-counter">Онлайн: 0</div>
+    <div class="game-title">ArtikWordle</div>
 
-    <h1>ArtikWordle</h1>
+    <div id="main-menu">
+        <button class="menu-btn" onclick="startGame('solo')">Одиночный режим</button>
+        <button class="menu-btn bot" onclick="startGame('bot')">Сражение с ботом</button>
+    </div>
 
-    <div id="game-container">
-        <div id="status-msg" style="margin-bottom: 10px; height: 1.2em;"></div>
-        <div class="grid" id="board">
-            </div>
-
-        <div id="keyboard">
-            </div>
+    <div id="game-zone">
+        <div id="status-text">ОТГАДЫВАЙТЕ!</div>
+        <div class="grid" id="board"></div>
+        <div id="keyboard"></div>
+        <button class="back-btn" onclick="location.reload()">В ГЛАВНОЕ МЕНЮ</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
