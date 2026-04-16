@@ -1,69 +1,151 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ArtikWordle Ultimate</title>
-    <style>
-        body { background: #121213; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px; }
-        .user-stats { position: absolute; top: 10px; left: 10px; text-align: left; }
-        .rank { color: #854ce6; font-weight: bold; font-size: 12px; }
-        #online-counter { position: absolute; top: 10px; right: 10px; color: #818384; font-size: 14px; }
-        .menu-card { width: 100%; max-width: 400px; background: #1a1a1b; padding: 20px; border-radius: 10px; border: 1px solid #3a3a3c; text-align: center; margin-top: 50px; }
-        #lobby-list { background: #121213; border: 1px solid #3a3a3c; height: 150px; overflow-y: auto; margin: 15px 0; border-radius: 5px; }
-        .room-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #3a3a3c; font-size: 14px; }
-        .hidden { display: none; }
-        button { cursor: pointer; background: #538d4e; color: white; border: none; padding: 10px 15px; margin: 5px; border-radius: 4px; font-weight: bold; }
-        button.bot { background: #b59f3b; }
-        button.solo { background: #818384; }
-        input { padding: 10px; background: #121213; border: 1px solid #3a3a3c; color: white; border-radius: 4px; width: 80%; }
-        #chat-messages { height: 120px; overflow-y: auto; background: #272729; margin: 10px 0; padding: 5px; font-size: 13px; text-align: left; }
-    </style>
-</head>
-<body>
-    <div class="user-stats">
-        <div id="player-name-display">Player ✏️</div>
-        <div class="rank" id="player-rank">SILVER I</div>
-        <div style="width: 100px; height: 4px; background: #3a3a3c; margin-top: 4px;">
-            <div id="xp-bar" style="width: 30%; height: 100%; background: #854ce6;"></div>
-        </div>
-    </div>
+const socket = io();
+let currentRoomId = null;
 
-    <div id="online-counter">Онлайн: 0</div>
+// --- ДАННЫЕ ИГРОКА (РАНГИ И НИК) ---
+let myName = localStorage.getItem('artik_name') || "Player";
+let myXP = parseInt(localStorage.getItem('artik_xp')) || 0;
 
-    <div id="main-menu" class="menu-card">
-        <h1>ArtikWordle</h1>
-        
-        <div id="mode-selection">
-            <button class="solo" onclick="startSolo()">Одиночный режим</button>
-            <button class="bot" onclick="startBot()">Сражение с ботом</button>
-            <hr style="border: 0.5px solid #3a3a3c; margin: 20px 0;">
-            <h3>Мультиплеер</h3>
-            <div id="lobby-list"></div>
-            <button onclick="openCreateModal()">Создать комнату</button>
-        </div>
-    </div>
+function updateUIStats() {
+    const nameDisplay = document.getElementById('player-name-display');
+    const rankDisplay = document.getElementById('player-rank');
+    const xpBar = document.getElementById('xp-bar');
 
-    <div id="game-zone" class="hidden">
-        <h2 id="game-title">Мультиплеер</h2>
-        <div id="game-status">Ожидание...</div>
-        
-        <div id="setup-controls">
-            <input type="text" id="target-word-input" maxlength="5" placeholder="Загадайте слово (5 букв)">
-            <button onclick="confirmTargetWord()">ОК</button>
-        </div>
+    if (nameDisplay) nameDisplay.innerText = myName + " ✏️";
+    
+    // Логика рангов
+    let rankName = "SILVER I";
+    if (myXP >= 1000) rankName = "GOLD I";
+    if (myXP >= 3000) rankName = "PLATINUM I";
+    
+    if (rankDisplay) rankDisplay.innerText = rankName;
+    if (xpBar) xpBar.style.width = (myXP % 1000) / 10 + "%";
+}
 
-        <div id="wordle-board" style="margin: 20px 0;"></div>
+// Редактирование ника
+document.getElementById('player-name-display').onclick = () => {
+    const newName = prompt("Введите ваш ник:", myName);
+    if (newName) {
+        myName = newName;
+        localStorage.setItem('artik_name', myName);
+        updateUIStats();
+    }
+};
 
-        <div id="multiplayer-footer">
-            <div id="chat-messages"></div>
-            <input type="text" id="chat-input" placeholder="Сообщение..." style="width: 70%;">
-            <button onclick="sendChatMessage()">></button>
-        </div>
-        <button class="solo" onclick="location.reload()" style="margin-top: 20px;">В меню</button>
-    </div>
+// --- ОДИНОЧНАЯ ИГРА И БОТ ---
+function startSolo() {
+    document.getElementById('main-menu').classList.add('hidden');
+    document.getElementById('game-zone').classList.remove('hidden');
+    document.getElementById('game-title').innerText = "Одиночный режим";
+    document.getElementById('setup-controls').classList.add('hidden'); // В соло слово дает сервер/рандом
+    document.getElementById('game-status').innerText = "Отгадайте слово!";
+    console.log("Одиночный режим запущен");
+}
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js"></script>
-</body>
-</html>
+function startBot() {
+    startSolo();
+    document.getElementById('game-title').innerText = "Сражение с ботом";
+    console.log("Игра с ботом запущена");
+}
+
+// --- МУЛЬТИПЛЕЕР: ЛОББИ И ПАРОЛИ ---
+function openCreateModal() {
+    const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const isPublic = confirm("Сделать комнату публичной (отображать в списке)?");
+    const password = prompt("Введите пароль лобби (оставьте пустым, если не нужен):");
+    
+    socket.emit('create_room', { roomId, password, isPublic });
+    enterRoom(roomId);
+}
+
+function joinLobby(id, hasPass) {
+    let password = null;
+    if (hasPass) {
+        password = prompt("Это приватное лобби. Введите пароль:");
+        if (password === null) return;
+    }
+    socket.emit('join_room', { roomId: id, password });
+}
+
+socket.on('join_success', (id) => enterRoom(id));
+socket.on('error_msg', (msg) => alert(msg));
+
+function enterRoom(id) {
+    currentRoomId = id;
+    document.getElementById('main-menu').classList.add('hidden');
+    document.getElementById('game-zone').classList.remove('hidden');
+    document.getElementById('game-title').innerText = "Лобби: " + id;
+    document.getElementById('setup-controls').classList.remove('hidden');
+    document.getElementById('game-status').innerText = "Загадайте слово сопернику!";
+}
+
+// --- ИГРОВАЯ ЛОГИКА ---
+function confirmTargetWord() {
+    const input = document.getElementById('target-word-input');
+    const word = input.value.toUpperCase().trim();
+    
+    if (word.length !== 5) {
+        alert("Слово должно быть из 5 букв!");
+        return;
+    }
+
+    socket.emit('set_word', { roomId: currentRoomId, word });
+    document.getElementById('setup-controls').classList.add('hidden');
+    document.getElementById('game-status').innerText = "Слово отправлено. Ждем соперника...";
+}
+
+socket.on('game_started', () => {
+    document.getElementById('game-status').innerText = "Игра началась! Отгадывайте!";
+});
+
+// Когда кто-то не угадал (или выиграл)
+socket.on('end_game', (data) => {
+    const status = document.getElementById('game-status');
+    if (data.success) {
+        status.innerHTML = "<span style='color:#538d4e'>ПОБЕДА! +150 XP</span>";
+        myXP += 150;
+        localStorage.setItem('artik_xp', myXP);
+        updateUIStats();
+    } else {
+        // Выводим загаданное слово всем
+        status.innerHTML = `<span style='color:#ff4d4d'>ПРОИГРЫШ. БЫЛО ЗАГАДАНО: ${data.word}</span>`;
+    }
+});
+
+// --- ОНЛАЙН И ЧАТ ---
+socket.on('update_online', (count) => {
+    document.getElementById('online-counter').innerText = "Онлайн: " + count;
+});
+
+socket.on('rooms_list', (rooms) => {
+    const list = document.getElementById('lobby-list');
+    list.innerHTML = '';
+    if (rooms.length === 0) {
+        list.innerHTML = '<div style="color:#818384; padding-top:40px;">Нет открытых лобби</div>';
+        return;
+    }
+    rooms.forEach(room => {
+        const div = document.createElement('div');
+        div.className = 'room-item';
+        div.innerHTML = `
+            <span>Лобби: <b>${room.id}</b> ${room.hasPass ? '🔒' : '🔓'}</span>
+            <button onclick="joinLobby('${room.id}', ${room.hasPass})">Войти</button>
+        `;
+        list.appendChild(div);
+    });
+});
+
+function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    if (!input.value.trim()) return;
+    socket.emit('send_chat_msg', { roomId: currentRoomId, text: input.value, user: myName });
+    input.value = '';
+}
+
+socket.on('new_chat_msg', (data) => {
+    const box = document.getElementById('chat-messages');
+    box.innerHTML += `<div><b>${data.user}:</b> ${data.text}</div>`;
+    box.scrollTop = box.scrollHeight;
+});
+
+// Инициализация при загрузке
+updateUIStats();
