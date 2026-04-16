@@ -3,52 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ArtikWordle Multiplayer</title>
+    <title>ArtikWordle Ultimate</title>
     <style>
-        body { background: #121213; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
-        #online-counter { position: absolute; top: 10px; right: 10px; font-size: 14px; color: #818384; }
-        #main-menu, #game-zone { width: 100%; max-width: 400px; text-align: center; }
-        #lobby-list { border: 2px solid #3a3a3c; border-radius: 8px; min-height: 150px; margin: 20px 0; padding: 10px; background: #1a1a1b; }
-        .room-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #3a3a3c; }
-        .room-item:last-child { border-bottom: none; }
-        #chat-messages { height: 200px; overflow-y: auto; background: #272729; padding: 10px; border: 1px solid #3a3a3c; margin-bottom: 10px; text-align: left; border-radius: 4px; display: flex; flex-direction: column; gap: 5px; }
+        body { background: #121213; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 10px; }
+        .user-stats { position: absolute; top: 10px; left: 10px; text-align: left; }
+        .rank { color: #854ce6; font-weight: bold; font-size: 12px; }
+        #online-counter { position: absolute; top: 10px; right: 10px; color: #818384; font-size: 14px; }
+        .menu-card { width: 100%; max-width: 400px; background: #1a1a1b; padding: 20px; border-radius: 10px; border: 1px solid #3a3a3c; text-align: center; margin-top: 50px; }
+        #lobby-list { background: #121213; border: 1px solid #3a3a3c; height: 150px; overflow-y: auto; margin: 15px 0; border-radius: 5px; }
+        .room-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #3a3a3c; font-size: 14px; }
         .hidden { display: none; }
-        button { cursor: pointer; background: #538d4e; color: white; border: none; padding: 12px 20px; margin: 5px; border-radius: 4px; font-weight: bold; font-size: 16px; }
-        button.secondary { background: #818384; }
-        input { padding: 12px; border-radius: 4px; border: 1px solid #3a3a3c; background: #121213; color: white; font-size: 16px; outline: none; }
-        input:focus { border-color: #565758; }
-        #game-status { font-size: 1.2rem; margin: 20px 0; font-weight: bold; min-height: 1.5em; }
-        .chat-row { display: flex; gap: 5px; justify-content: center; }
+        button { cursor: pointer; background: #538d4e; color: white; border: none; padding: 10px 15px; margin: 5px; border-radius: 4px; font-weight: bold; }
+        button.bot { background: #b59f3b; }
+        button.solo { background: #818384; }
+        input { padding: 10px; background: #121213; border: 1px solid #3a3a3c; color: white; border-radius: 4px; width: 80%; }
+        #chat-messages { height: 120px; overflow-y: auto; background: #272729; margin: 10px 0; padding: 5px; font-size: 13px; text-align: left; }
     </style>
 </head>
 <body>
-    <div id="online-counter">Загрузка онлайна...</div>
-    <h1>ArtikWordle</h1>
+    <div class="user-stats">
+        <div id="player-name-display">Player ✏️</div>
+        <div class="rank" id="player-rank">SILVER I</div>
+        <div style="width: 100px; height: 4px; background: #3a3a3c; margin-top: 4px;">
+            <div id="xp-bar" style="width: 30%; height: 100%; background: #854ce6;"></div>
+        </div>
+    </div>
 
-    <div id="main-menu">
-        <h3>Открытые лобби</h3>
-        <div id="lobby-list"></div>
-        <button onclick="createNewLobby()">Создать лобби</button>
+    <div id="online-counter">Онлайн: 0</div>
+
+    <div id="main-menu" class="menu-card">
+        <h1>ArtikWordle</h1>
+        
+        <div id="mode-selection">
+            <button class="solo" onclick="startSolo()">Одиночный режим</button>
+            <button class="bot" onclick="startBot()">Сражение с ботом</button>
+            <hr style="border: 0.5px solid #3a3a3c; margin: 20px 0;">
+            <h3>Мультиплеер</h3>
+            <div id="lobby-list"></div>
+            <button onclick="openCreateModal()">Создать комнату</button>
+        </div>
     </div>
 
     <div id="game-zone" class="hidden">
-        <div id="game-status">Ожидание загадывания...</div>
+        <h2 id="game-title">Мультиплеер</h2>
+        <div id="game-status">Ожидание...</div>
         
         <div id="setup-controls">
-            <input type="text" id="target-word-input" maxlength="5" placeholder="Введите 5 букв">
-            <button onclick="confirmTargetWord()">Загадать</button>
+            <input type="text" id="target-word-input" maxlength="5" placeholder="Загадайте слово (5 букв)">
+            <button onclick="confirmTargetWord()">ОК</button>
         </div>
 
         <div id="wordle-board" style="margin: 20px 0;"></div>
 
-        <div id="chat-section">
+        <div id="multiplayer-footer">
             <div id="chat-messages"></div>
-            <div class="chat-row">
-                <input type="text" id="chat-input" placeholder="Сообщение..." style="flex-grow: 1;">
-                <button class="secondary" onclick="sendChatMessage()">></button>
-            </div>
+            <input type="text" id="chat-input" placeholder="Сообщение..." style="width: 70%;">
+            <button onclick="sendChatMessage()">></button>
         </div>
-        <button class="secondary" style="margin-top: 20px;" onclick="location.reload()">Выйти в меню</button>
+        <button class="solo" onclick="location.reload()" style="margin-top: 20px;">В меню</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
