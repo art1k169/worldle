@@ -3,16 +3,15 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 
-app.use(express.static(__dirname + '/public'));
+app.use(express.static('public'));
 
 let rooms = {};
-let totalConnections = 0;
+let online = 0;
 
 io.on('connection', (socket) => {
-    totalConnections++;
-    io.emit('update_online', totalConnections);
-    
-    sendPublicRooms(socket);
+    online++;
+    io.emit('update_online', online);
+    broadcastRooms();
 
     socket.on('create_room', (data) => {
         rooms[data.roomId] = {
@@ -23,22 +22,18 @@ io.on('connection', (socket) => {
             players: [socket.id]
         };
         socket.join(data.roomId);
-        broadcastPublicRooms();
+        broadcastRooms();
     });
 
     socket.on('join_room', (data) => {
-        const room = rooms[data.roomId];
-        if (!room) {
-            socket.emit('error_msg', 'Лобби не найдено');
-            return;
+        const r = rooms[data.roomId];
+        if (r && (!r.password || r.password === data.password)) {
+            socket.join(data.roomId);
+            r.players.push(socket.id);
+            socket.emit('join_success', data.roomId);
+        } else {
+            socket.emit('error_msg', 'Ошибка входа или пароль');
         }
-        if (room.password && room.password !== data.password) {
-            socket.emit('error_msg', 'Неверный пароль');
-            return;
-        }
-        socket.join(data.roomId);
-        room.players.push(socket.id);
-        socket.emit('join_success', data.roomId);
     });
 
     socket.on('set_word', (data) => {
@@ -50,46 +45,28 @@ io.on('connection', (socket) => {
 
     socket.on('game_lost', (roomId) => {
         if (rooms[roomId]) {
-            const word = rooms[roomId].targetWord;
-            io.to(roomId).emit('end_game', { success: false, word: word });
+            io.to(roomId).emit('end_game', { success: false, word: rooms[roomId].targetWord });
         }
     });
 
     socket.on('send_chat_msg', (data) => {
-        io.to(data.roomId).emit('new_chat_msg', {
-            user: data.user,
-            text: data.text
-        });
+        io.to(data.roomId).emit('new_chat_msg', data);
     });
 
     socket.on('disconnect', () => {
-        totalConnections--;
-        io.emit('update_online', totalConnections);
-        for (let roomId in rooms) {
-            rooms[roomId].players = rooms[roomId].players.filter(id => id !== socket.id);
-            if (rooms[roomId].players.length === 0) {
-                delete rooms[roomId];
-                broadcastPublicRooms();
-            }
+        online--;
+        io.emit('update_online', online);
+        for (let id in rooms) {
+            rooms[id].players = rooms[id].players.filter(p => p !== socket.id);
+            if (rooms[id].players.length === 0) delete rooms[id];
         }
+        broadcastRooms();
     });
 });
 
-function sendPublicRooms(socket) {
-    const publicList = Object.values(rooms)
-        .filter(r => r.isPublic)
-        .map(r => ({ id: r.id, hasPass: !!r.password }));
-    socket.emit('rooms_list', publicList);
+function broadcastRooms() {
+    const list = Object.values(rooms).filter(r => r.isPublic).map(r => ({ id: r.id, hasPass: !!r.password }));
+    io.emit('rooms_list', list);
 }
 
-function broadcastPublicRooms() {
-    const publicList = Object.values(rooms)
-        .filter(r => r.isPublic)
-        .map(r => ({ id: r.id, hasPass: !!r.password }));
-    io.emit('rooms_list', publicList);
-}
-
-const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => {
-    console.log('Server is running on port ' + PORT);
-});
+http.listen(3000, () => console.log('Workle LIVE on 3000'));
