@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ArtikWordle XP</title>
+    <title>ArtikWordle XP Pro</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         :root { --bg: #121213; --text: #ffffff; --border: #3a3a3c; --correct: #6aaa64; --present: #c9b458; --absent: #787c7e; --key: #818384; --accent: #7c3aed; }
-        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; min-height: 100vh; overflow-x: hidden; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; min-height: 100vh; overflow: hidden; }
         
-        /* Ник и Ранг в углу */
-        #user-card { position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; border-left: 3px solid var(--accent); min-width: 120px; }
+        #user-card { position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; border-left: 3px solid var(--accent); min-width: 120px; z-index: 10; }
         #u-name { font-weight: bold; font-size: 14px; margin-bottom: 2px; }
         #u-rank { font-size: 11px; color: var(--accent); font-weight: 800; }
         #u-xp { font-size: 10px; opacity: 0.6; }
@@ -21,7 +20,7 @@
         
         #board { display: grid; gap: 5px; margin-bottom: 20px; }
         .row { display: flex; gap: 5px; }
-        .tile { width: 52px; height: 52px; border: 2px solid var(--border); display: flex; justify-content: center; align-items: center; font-size: 26px; font-weight: bold; text-transform: uppercase; transition: 0.3s; }
+        .tile { width: 52px; height: 52px; border: 2px solid var(--border); display: flex; justify-content: center; align-items: center; font-size: 26px; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
         
         #keyboard { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 480px; padding: 10px; box-sizing: border-box; }
         .k-row { display: flex; justify-content: center; gap: 4px; }
@@ -56,8 +55,8 @@
     </div>
 
     <div id="sc-lobby" class="screen">
-        <h1 id="r-code" style="color:var(--accent); font-size: 45px; letter-spacing: 5px; margin: 10px 0;">------</h1>
-        <div id="p-list" style="margin-bottom: 20px; font-size: 18px;">Ожидание соперника...</div>
+        <h1 id="r-code" style="color:var(--accent); font-size: 45px; letter-spacing: 5px;">------</h1>
+        <div id="p-list" style="margin-bottom: 20px;">Ожидание...</div>
         <button id="start-btn" class="main-btn" style="display:none" onclick="socket.emit('startGame', curRoom)">Начать игру</button>
         <button class="main-btn" style="background:#ef4444" onclick="location.reload()">Выйти</button>
     </div>
@@ -73,8 +72,7 @@
         const socket = io("https://worldle-rcee.onrender.com");
         let curRoom = "", myRole = "", curRow = 0, curTile = 0, gameActive = false, secretWord = "";
         
-        // Ранги
-        const RANKS = ["SILVER I", "SILVER II", "GOLD I", "GOLD II", "PLATINUM", "DIAMOND", "ELITE", "MASTER"];
+        const RANKS = ["SILVER I", "SILVER II", "GOLD I", "GOLD II", "PLATINUM", "DIAMOND", "MASTER"];
         let myXP = parseInt(localStorage.getItem('wordleXP')) || 0;
         let myNick = localStorage.getItem('wordleNick') || "Игрок";
 
@@ -83,7 +81,7 @@
             let rankIdx = Math.floor(myXP / 1000);
             if (rankIdx > RANKS.length - 1) rankIdx = RANKS.length - 1;
             document.getElementById('u-rank').innerText = RANKS[rankIdx];
-            document.getElementById('u-xp').innerText = `XP: ${myXP % 1000} / 1000 (Total: ${myXP})`;
+            document.getElementById('u-xp').innerText = `XP: ${myXP % 1000} / 1000`;
             localStorage.setItem('wordleXP', myXP);
         }
         updateUI();
@@ -93,7 +91,7 @@
             if(val) { myNick = val; localStorage.setItem('wordleNick', val); updateUI(); }
         }
 
-        // --- ЛОГИКА КОМНАТ ---
+        // --- КОМНАТЫ ---
         function create() { socket.emit('createRoom', { name: myNick }); }
         function join() { 
             curRoom = document.getElementById('code-in').value.toUpperCase(); 
@@ -106,15 +104,14 @@
         });
 
         socket.on('playerJoined', ps => { 
-            document.getElementById('p-list').innerText = ps.length > 1 ? "Соперник готов!" : "Ожидание игрока..."; 
+            document.getElementById('p-list').innerText = ps.length > 1 ? "Соперник подключился" : "Ожидание..."; 
         });
 
-        socket.on('roomClosed', () => { alert("Соперник покинул игру"); location.reload(); });
+        socket.on('roomClosed', () => { location.reload(); });
 
         socket.on('initRole', d => {
             myRole = d.role; show('sc-game');
-            initBoard(); initKeyboard();
-            curRow = 0; curTile = 0;
+            resetGameState();
             if(myRole === 'master') {
                 document.getElementById('game-status').innerText = "ЗАГАДАЙТЕ СЛОВО";
                 gameActive = true;
@@ -126,12 +123,17 @@
         // --- ГЕЙМПЛЕЙ ---
         function startSolo() {
             curRoom = ""; myRole = 'guesser'; 
-            const soloWords = ["АРБУЗ", "БАНАН", "ПОЕЗД", "ОКЕАН", "ЭКРАН", "КНИГА", "РУЧКА", "СПОРТ", "МЕТРО", "ОГОНЬ"];
+            const soloWords = ["АРБУЗ", "БАНАН", "ПОЕЗД", "ОКЕАН", "ЭКРАН", "КНИГА", "РУЧКА", "СПОРТ"];
             secretWord = soloWords[Math.floor(Math.random()*soloWords.length)];
-            show('sc-game'); initBoard(); initKeyboard();
-            curRow = 0; curTile = 0; gameActive = true;
+            show('sc-game'); resetGameState();
+            gameActive = true;
             document.getElementById('game-status').innerText = "ОДИНОЧНЫЙ РЕЖИМ";
+        }
+
+        function resetGameState() {
+            curRow = 0; curTile = 0;
             document.getElementById('back-btn').style.display = 'none';
+            initBoard(); initKeyboard();
         }
 
         function initBoard() {
@@ -165,25 +167,29 @@
             if(!gameActive) return;
             const k = e.key.toUpperCase();
             
-            if(k === 'ENTER') {
-                if(curTile < 5) return;
-                let word = "";
-                for(let i=0; i<5; i++) word += document.getElementById(`t-${curRow}-${i}`).innerText;
-                
-                if(myRole === 'master') {
-                    socket.emit('setSecretWord', { code: curRoom, word: word });
-                    gameActive = false;
-                    document.getElementById('game-status').innerText = "СЛОВО ОТПРАВЛЕНО!";
-                } else {
-                    if(curRoom) socket.emit('submitGuess', { code: curRoom, guess: word });
-                    else checkSolo(word);
-                    gameActive = false;
+            if(k === 'ENTER' || k === 'BACKSPACE' || (k.length === 1 && /[А-ЯЁ]/.test(k))) {
+                if(k === 'ENTER') {
+                    if(curTile < 5) return;
+                    let word = "";
+                    for(let i=0; i<5; i++) word += document.getElementById(`t-${curRow}-${i}`).innerText;
+                    
+                    if(myRole === 'master') {
+                        socket.emit('setSecretWord', { code: curRoom, word: word });
+                        gameActive = false;
+                        document.getElementById('game-status').innerText = "СЛОВО ОТПРАВЛЕНО!";
+                        initBoard(); // Очищаем поле для мастера, чтобы видеть ходы оппонента
+                        curRow = 0; curTile = 0;
+                    } else {
+                        if(curRoom) socket.emit('submitGuess', { code: curRoom, guess: word });
+                        else checkSolo(word);
+                        gameActive = false;
+                    }
+                } else if(k === 'BACKSPACE') {
+                    if(curTile > 0) { curTile--; document.getElementById(`t-${curRow}-${curTile}`).innerText = ""; }
+                } else if(curTile < 5) {
+                    document.getElementById(`t-${curRow}-${curTile}`).innerText = k;
+                    curTile++;
                 }
-            } else if(k === 'BACKSPACE') {
-                if(curTile > 0) { curTile--; document.getElementById(`t-${curRow}-${curTile}`).innerText = ""; }
-            } else if(curTile < 5 && k.length === 1 && /[А-ЯЁ]/.test(k)) {
-                document.getElementById(`t-${curRow}-${curTile}`).innerText = k;
-                curTile++;
             }
         }
 
@@ -195,10 +201,11 @@
         });
 
         socket.on('guessResult', d => {
+            // Отрисовка результата (видна и мастеру, и игроку)
             d.states.forEach((s, i) => {
                 const t = document.getElementById(`t-${curRow}-${i}`);
                 t.classList.add(s);
-                updateKeyColor(d.guess[i], s);
+                if(myRole === 'guesser') updateKeyColor(d.guess[i], s);
             });
             if(d.isWin || curRow >= 5) end(d.isWin);
             else { curRow++; curTile = 0; if(myRole === 'guesser') gameActive = true; }
@@ -224,23 +231,23 @@
 
         function end(win) {
             gameActive = false;
-            let xpChange = 0;
-            
-            if(curRoom) { // В мультиплеере меняем XP
-                if(win) { xpChange = 100; document.getElementById('game-status').innerText = "ПОБЕДА! +100 XP"; }
-                else { xpChange = -50; document.getElementById('game-status').innerText = "ПРОИГРЫШ! -50 XP. СЛОВО: " + secretWord; }
-                myXP += xpChange;
-                if(myXP < 0) myXP = 0;
+            if(curRoom) {
+                if(win) { myXP += 100; document.getElementById('game-status').innerText = "ПОБЕДА! +100 XP"; }
+                else { myXP -= 50; if(myXP < 0) myXP = 0; document.getElementById('game-status').innerText = "ПРОИГРЫШ. СЛОВО: " + secretWord; }
                 updateUI();
             } else {
                 document.getElementById('game-status').innerText = win ? "ПОБЕДА!" : "ПРОИГРЫШ. СЛОВО: " + secretWord;
             }
-            
             document.getElementById('back-btn').style.display = 'block';
         }
 
         function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-        window.addEventListener('keydown', handleInput);
+        
+        // СЛУШАТЕЛЬ ФИЗИЧЕСКОЙ КЛАВИАТУРЫ
+        window.addEventListener('keydown', (e) => {
+            const activeInput = document.activeElement.tagName === 'INPUT';
+            if(!activeInput) handleInput(e);
+        });
     </script>
 </body>
 </html>
