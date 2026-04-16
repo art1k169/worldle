@@ -1,6 +1,15 @@
 const socket = io();
 let currentRoomId = null;
-let myName = "Игрок_" + Math.floor(Math.random() * 1000);
+let myName = localStorage.getItem('artik_name') || "Игрок";
+let myXP = parseInt(localStorage.getItem('artik_xp')) || 0;
+
+function updateUIStats() {
+    document.getElementById('player-name-display').innerText = myName + " ✏️";
+    const rank = myXP < 1000 ? "SILVER I" : myXP < 3000 ? "GOLD I" : "PLATINUM I";
+    document.getElementById('player-rank').innerText = rank;
+    document.getElementById('xp-bar').style.width = (myXP % 1000) / 10 + "%";
+}
+updateUIStats();
 
 socket.on('update_online', (count) => {
     document.getElementById('online-counter').innerText = "Онлайн: " + count;
@@ -10,97 +19,86 @@ socket.on('rooms_list', (rooms) => {
     const list = document.getElementById('lobby-list');
     list.innerHTML = '';
     if (rooms.length === 0) {
-        list.innerHTML = '<div style="color: #818384; padding-top: 60px;">Нет активных лобби</div>';
+        list.innerHTML = '<div style="padding-top: 50px; color: #818384;">Комнат пока нет</div>';
         return;
     }
     rooms.forEach(room => {
         const div = document.createElement('div');
         div.className = 'room-item';
-        const lockIcon = room.hasPass ? '🔒' : '🔓';
         div.innerHTML = `
-            <span>Лобби: <b>${room.id}</b> ${lockIcon}</span>
-            <button class="secondary" onclick="joinLobby('${room.id}', ${room.hasPass})">Войти</button>
+            <span>Лобби: <b>${room.id}</b> ${room.hasPass ? '🔒' : '🔓'}</span>
+            <button onclick="joinLobby('${room.id}', ${room.hasPass})">Войти</button>
         `;
         list.appendChild(div);
     });
 });
 
-function createNewLobby() {
+function startSolo() {
+    alert("Запуск одиночного режима...");
+    document.getElementById('main-menu').classList.add('hidden');
+    document.getElementById('game-zone').classList.remove('hidden');
+    document.getElementById('game-title').innerText = "Одиночный режим";
+    document.getElementById('multiplayer-footer').classList.add('hidden');
+    document.getElementById('setup-controls').classList.add('hidden');
+}
+
+function startBot() {
+    alert("Бот готовится к игре...");
+    startSolo();
+    document.getElementById('game-title').innerText = "Игра с Ботом";
+}
+
+function openCreateModal() {
     const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
-    const isPublic = confirm("Сделать лобби публичным для всех?");
-    const password = prompt("Введите пароль (пусто для входа без пароля):");
+    const isPublic = confirm("Сделать комнату публичной?");
+    const password = prompt("Установите пароль (оставьте пустым для входа всех):");
     socket.emit('create_room', { roomId, password, isPublic });
-    enterLobbyView(roomId);
+    enterRoom(roomId);
 }
 
 function joinLobby(id, hasPass) {
-    let password = null;
-    if (hasPass) {
-        password = prompt("Введите пароль лобби:");
-        if (password === null) return;
-    }
+    let password = hasPass ? prompt("Введите пароль:") : null;
     socket.emit('join_room', { roomId: id, password });
 }
 
-socket.on('join_success', (roomId) => {
-    enterLobbyView(roomId);
-});
+socket.on('join_success', (id) => enterRoom(id));
+socket.on('error_msg', (msg) => alert(msg));
 
-socket.on('error_msg', (msg) => {
-    alert(msg);
-});
-
-function enterLobbyView(id) {
+function enterRoom(id) {
     currentRoomId = id;
     document.getElementById('main-menu').classList.add('hidden');
     document.getElementById('game-zone').classList.remove('hidden');
-    document.getElementById('game-status').innerText = "Вы в лоbби " + id + ". Загадайте слово!";
+    document.getElementById('game-title').innerText = "Лобби: " + id;
 }
 
 function confirmTargetWord() {
-    const input = document.getElementById('target-word-input');
-    const word = input.value.toUpperCase().trim();
-    if (word.length !== 5) {
-        alert("Слово должно состоять ровно из 5 букв!");
-        return;
-    }
-    socket.emit('set_word', { roomId: currentRoomId, word: word });
+    const word = document.getElementById('target-word-input').value.toUpperCase().trim();
+    if (word.length !== 5) return alert("Нужно 5 букв!");
+    socket.emit('set_word', { roomId: currentRoomId, word });
     document.getElementById('setup-controls').classList.add('hidden');
-    document.getElementById('game-status').innerText = "СЛОВО ПРИНЯТО. ИГРА НАЧАТА!";
 }
-
-socket.on('game_started', () => {
-    document.getElementById('setup-controls').classList.add('hidden');
-    document.getElementById('game-status').innerText = "ОТГАДЫВАЙТЕ СЛОВО!";
-});
 
 socket.on('end_game', (data) => {
     const status = document.getElementById('game-status');
     if (data.success) {
-        status.style.color = "#538d4e";
-        status.innerText = "ПОБЕДА!";
+        myXP += 150;
+        localStorage.setItem('artik_xp', myXP);
+        updateUIStats();
+        status.innerHTML = "<span style='color:#538d4e'>ПОБЕДА! +150 XP</span>";
     } else {
-        status.style.color = "#ff4d4d";
-        status.innerText = "ПРОИГРЫШ. ЗАГАДАНО: " + data.word;
+        status.innerHTML = `<span style='color:#ff4d4d'>ПРОИГРЫШ. БЫЛО: ${data.word}</span>`;
     }
 });
 
 function sendChatMessage() {
     const input = document.getElementById('chat-input');
-    const text = input.value.trim();
-    if (text === "") return;
-    socket.emit('send_chat_msg', { roomId: currentRoomId, text: text, user: myName });
+    if (!input.value) return;
+    socket.emit('send_chat_msg', { roomId: currentRoomId, text: input.value, user: myName });
     input.value = '';
 }
 
 socket.on('new_chat_msg', (data) => {
-    const msgBox = document.getElementById('chat-messages');
-    const div = document.createElement('div');
-    div.innerHTML = `<span style="color: #818384;">${data.user}:</span> <span>${data.text}</span>`;
-    msgBox.appendChild(div);
-    msgBox.scrollTop = msgBox.scrollHeight;
-});
-
-document.getElementById('chat-input').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendChatMessage();
+    const box = document.getElementById('chat-messages');
+    box.innerHTML += `<div><b>${data.user}:</b> ${data.text}</div>`;
+    box.scrollTop = box.scrollHeight;
 });
