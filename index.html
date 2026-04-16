@@ -20,11 +20,12 @@
         header { width: 100%; border-bottom: 1px solid var(--header-border); padding: 15px 0; text-align: center; position: relative; }
         .theme-toggle { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 20px; user-select: none; }
         
+        /* Панель игрока сверху */
         .user-card { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); text-align: left; width: 180px; }
-        .nick-container { display: flex; align-items: center; gap: 5px; margin-bottom: 2px; }
+        .nick-container { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
         #stat-nick { font-size: 14px; font-weight: bold; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .edit-icon { cursor: pointer; font-size: 12px; opacity: 0.6; transition: 0.2s; }
-        .edit-icon:hover { opacity: 1; color: var(--accent); }
+        .edit-btn { cursor: pointer; font-size: 14px; opacity: 0.7; transition: 0.2s; }
+        .edit-btn:hover { opacity: 1; transform: scale(1.1); }
         
         .rank-name { font-weight: bold; font-size: 11px; text-transform: uppercase; color: var(--accent); letter-spacing: 0.5px; }
         .xp-container { width: 100%; height: 6px; background: var(--border); border-radius: 3px; margin-top: 4px; overflow: hidden; }
@@ -34,24 +35,21 @@
         .active { display: flex; }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
         input { padding: 15px; border: 2px solid var(--border); border-radius: 10px; width: 85%; font-size: 16px; margin-bottom: 12px; background: transparent; color: var(--text); outline: none; }
         button { padding: 16px; width: 92%; background: var(--accent); color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; text-transform: uppercase; margin-bottom: 10px; transition: 0.2s; }
-        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        button:hover { filter: brightness(1.1); }
         .secondary-btn { background: var(--absent); }
 
         #board { display: grid; gap: 8px; margin: 20px 0; }
         .row { display: flex; gap: 8px; }
         .tile { width: 55px; height: 55px; border: 2px solid var(--border); display: flex; justify-content: center; align-items: center; font-size: 28px; font-weight: bold; text-transform: uppercase; background: var(--tile-bg); transition: 0.3s; color: var(--text); }
-        .tile.filled { border-color: var(--absent); animation: pop 0.1s; }
         
         .correct { background: var(--correct) !important; border-color: var(--correct) !important; color: white !important; }
         .present { background: var(--present) !important; border-color: var(--present) !important; color: white !important; }
         .absent { background: var(--absent) !important; border-color: var(--absent) !important; color: white !important; }
-        .flip { transform: rotateX(90deg); }
 
-        .player-badge { background: var(--border); padding: 10px 15px; border-radius: 12px; margin: 5px; width: 85%; display: flex; justify-content: space-between; font-size: 14px; color: var(--text); }
+        .player-badge { background: var(--border); padding: 10px 15px; border-radius: 12px; margin: 5px; width: 85%; display: flex; justify-content: space-between; font-size: 14px; }
     </style>
 </head>
 <body data-theme="light">
@@ -60,7 +58,7 @@
         <div class="user-card">
             <div class="nick-container">
                 <span id="stat-nick">Player</span>
-                <span class="edit-icon" onclick="editNick()">✏️</span>
+                <span class="edit-btn" onclick="changeNick()">✏️</span>
             </div>
             <div id="rank-name" class="rank-name">Silver I</div>
             <div class="xp-container"><div id="xp-bar"></div></div>
@@ -72,7 +70,7 @@
     <div id="sc-auth" class="screen active">
         <button onclick="create()">Создать комнату</button>
         <div style="margin: 15px; font-weight: bold; opacity: 0.3;">ИЛИ</div>
-        <input type="text" id="code-in" placeholder="Введите код комнаты" autocomplete="off">
+        <input type="text" id="code-in" placeholder="Введите код комнаты" maxlength="6" autocomplete="off">
         <button class="secondary-btn" onclick="join()">Присоединиться</button>
     </div>
 
@@ -118,8 +116,8 @@
         }
         updateUI();
 
-        function editNick() {
-            const newNick = prompt("Введите новый никнейм:", stats.name);
+        function changeNick() {
+            const newNick = prompt("Введите ваш никнейм:", stats.name);
             if (newNick && newNick.trim().length > 0) {
                 stats.name = newNick.trim().substring(0, 12);
                 updateUI();
@@ -136,22 +134,18 @@
             document.getElementById(id).classList.add('active');
         }
 
-        function create() { 
-            socket.emit('createRoom', { name: stats.name }); 
-        }
+        function create() { socket.emit('createRoom', { name: stats.name }); }
         
         function join() {
-            const codeInput = document.getElementById('code-in').value.toUpperCase();
-            if(codeInput.length < 1) return alert("Введите код!");
-            curRoom = codeInput;
+            const code = document.getElementById('code-in').value.toUpperCase();
+            if(!code) return alert("Введите код!");
+            curRoom = code;
             socket.emit('joinRoom', { code: curRoom, name: stats.name });
             show('sc-lobby');
             document.getElementById('r-code').innerText = curRoom;
         }
 
-        function start() { 
-            socket.emit('startGame', curRoom); 
-        }
+        function start() { socket.emit('startGame', curRoom); }
 
         socket.on('roomCreated', d => {
             curRoom = d.code;
@@ -211,35 +205,30 @@
             } else if(e.key === 'Backspace' && curTile > 0) {
                 curTile--;
                 const t = document.getElementById(`t-${curRow}-${curTile}`);
-                t.innerText = ""; t.classList.remove('filled');
+                t.innerText = "";
+                curTile = Math.max(0, curTile);
             } else if(curTile < 5 && e.key.length === 1 && /[а-яА-ЯёЁa-zA-Z]/.test(e.key)) {
                 tile.innerText = e.key.toUpperCase();
-                tile.classList.add('filled');
                 curTile++;
             }
         }
 
         socket.on('guessResult', d => {
             d.states.forEach((s, i) => {
-                setTimeout(() => {
-                    const t = document.getElementById(`t-${curRow}-${i}`);
-                    t.classList.add('flip');
-                    setTimeout(() => { t.classList.add(s); t.classList.remove('flip'); }, 200);
-                }, i * 150);
+                const t = document.getElementById(`t-${curRow}-${i}`);
+                t.classList.add(s);
             });
 
-            setTimeout(() => {
-                if(d.isWin) {
-                    document.getElementById('game-status').innerText = "Победа! +150 XP";
-                    if(myRole === 'guesser' && socket.id === d.senderId) { stats.score += 150; updateUI(); }
-                    document.getElementById('post-game').style.display = 'block';
-                } else if(curRow >= 5) {
-                    document.getElementById('game-status').innerText = "Поражение";
-                    document.getElementById('post-game').style.display = 'block';
-                } else {
-                    curRow++; curTile = 0; if(myRole === 'guesser') gameActive = true;
-                }
-            }, 1200);
+            if(d.isWin) {
+                document.getElementById('game-status').innerText = "Победа! +150 XP";
+                if(myRole === 'guesser' && socket.id === d.senderId) { stats.score += 150; updateUI(); }
+                document.getElementById('post-game').style.display = 'block';
+            } else if(curRow >= 5) {
+                document.getElementById('game-status').innerText = "Поражение";
+                document.getElementById('post-game').style.display = 'block';
+            } else {
+                curRow++; curTile = 0; if(myRole === 'guesser') gameActive = true;
+            }
         });
     </script>
 </body>
