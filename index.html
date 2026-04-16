@@ -3,167 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ArtikWordle Competitive</title>
+    <title>ArtikWordle Pro</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        :root {
-            --bg: #ffffff; --text: #1a1a1b; --border: #d3d6da;
-            --tile-bg: #ffffff; --correct: #6aaa64; --present: #c9b458; 
-            --absent: #787c7e; --header-border: #d3d6da; --accent: #7c3aed;
-        }
-        [data-theme="dark"] {
-            --bg: #121213; --text: #ffffff; --border: #3a3a3c;
-            --tile-bg: #121213; --header-border: #3a3a3c;
-        }
-        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; transition: 0.3s; min-height: 100vh; }
-        
-        header { width: 100%; border-bottom: 1px solid var(--header-border); padding: 15px 0; text-align: center; position: relative; }
-        .theme-toggle { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 20px; user-select: none; }
-        
-        /* Панель игрока сверху */
-        .user-card { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); text-align: left; width: 180px; }
-        .nick-container { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-        #stat-nick { font-size: 14px; font-weight: bold; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .edit-btn { cursor: pointer; font-size: 14px; opacity: 0.7; transition: 0.2s; }
-        .edit-btn:hover { opacity: 1; transform: scale(1.1); }
-        
-        .rank-name { font-weight: bold; font-size: 11px; text-transform: uppercase; color: var(--accent); letter-spacing: 0.5px; }
-        .xp-container { width: 100%; height: 6px; background: var(--border); border-radius: 3px; margin-top: 4px; overflow: hidden; }
-        #xp-bar { height: 100%; width: 0%; background: var(--accent); transition: 1s ease-out; }
-
-        .screen { display: none; width: 100%; max-width: 400px; flex-direction: column; align-items: center; padding-top: 60px; animation: fadeIn 0.4s; }
+        :root { --bg: #ffffff; --text: #1a1a1b; --border: #d3d6da; --correct: #6aaa64; --present: #c9b458; --absent: #787c7e; --key: #d3d6da; --accent: #7c3aed; }
+        [data-theme="dark"] { --bg: #121213; --text: #ffffff; --border: #3a3a3c; --key: #818384; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; min-height: 100vh; transition: 0.3s; }
+        header { width: 100%; border-bottom: 1px solid var(--border); padding: 10px 0; text-align: center; position: relative; }
+        .screen { display: none; width: 100%; max-width: 500px; flex-direction: column; align-items: center; padding-top: 40px; }
         .active { display: flex; }
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        input { padding: 15px; border: 2px solid var(--border); border-radius: 10px; width: 85%; font-size: 16px; margin-bottom: 12px; background: transparent; color: var(--text); outline: none; }
-        button { padding: 16px; width: 92%; background: var(--accent); color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; text-transform: uppercase; margin-bottom: 10px; transition: 0.2s; }
-        button:hover { filter: brightness(1.1); }
-        .secondary-btn { background: var(--absent); }
-
-        #board { display: grid; gap: 8px; margin: 20px 0; }
-        .row { display: flex; gap: 8px; }
-        .tile { width: 55px; height: 55px; border: 2px solid var(--border); display: flex; justify-content: center; align-items: center; font-size: 28px; font-weight: bold; text-transform: uppercase; background: var(--tile-bg); transition: 0.3s; color: var(--text); }
+        #board { display: grid; gap: 5px; margin-bottom: 20px; }
+        .row { display: flex; gap: 5px; }
+        .tile { width: 50px; height: 50px; border: 2px solid var(--border); display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; text-transform: uppercase; }
+        .correct { background: var(--correct); border-color: var(--correct); color: white; }
+        .present { background: var(--present); border-color: var(--present); color: white; }
+        .absent { background: var(--absent); border-color: var(--absent); color: white; }
         
-        .correct { background: var(--correct) !important; border-color: var(--correct) !important; color: white !important; }
-        .present { background: var(--present) !important; border-color: var(--present) !important; color: white !important; }
-        .absent { background: var(--absent) !important; border-color: var(--absent) !important; color: white !important; }
-
-        .player-badge { background: var(--border); padding: 10px 15px; border-radius: 12px; margin: 5px; width: 85%; display: flex; justify-content: space-between; font-size: 14px; }
+        #keyboard { display: flex; flex-direction: column; gap: 8px; width: 95%; margin-top: 20px; }
+        .k-row { display: flex; justify-content: center; gap: 4px; }
+        .key { background: var(--key); color: var(--text); border: none; padding: 15px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; min-width: 30px; text-transform: uppercase; }
+        
+        button { padding: 15px; width: 85%; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin: 5px 0; }
+        input { padding: 15px; width: 80%; margin-bottom: 10px; border: 2px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); }
+        .secret-view { margin-bottom: 10px; padding: 10px; background: var(--accent); color: white; border-radius: 5px; font-weight: bold; }
     </style>
 </head>
-<body data-theme="light">
-
+<body data-theme="dark">
     <header>
-        <div class="user-card">
-            <div class="nick-container">
-                <span id="stat-nick">Player</span>
-                <span class="edit-btn" onclick="changeNick()">✏️</span>
-            </div>
-            <div id="rank-name" class="rank-name">Silver I</div>
-            <div class="xp-container"><div id="xp-bar"></div></div>
-        </div>
-        <h2 style="margin:0; letter-spacing: 3px;">ArtikWordle</h2>
-        <div class="theme-toggle" onclick="toggleTheme()">🌙</div>
+        <h2>ArtikWordle</h2>
+        <div style="position:absolute; left:10px; top:15px; font-size:12px;" id="u-info">Player: Silver I</div>
     </header>
 
     <div id="sc-auth" class="screen active">
+        <button onclick="startSolo()">Одиночный режим</button>
+        <div style="margin:10px; opacity:0.5">— ИЛИ —</div>
         <button onclick="create()">Создать комнату</button>
-        <div style="margin: 15px; font-weight: bold; opacity: 0.3;">ИЛИ</div>
-        <input type="text" id="code-in" placeholder="Введите код комнаты" maxlength="6" autocomplete="off">
-        <button class="secondary-btn" onclick="join()">Присоединиться</button>
+        <input type="text" id="code-in" placeholder="Код лобби">
+        <button style="background:var(--absent)" onclick="join()">Войти по коду</button>
     </div>
 
     <div id="sc-lobby" class="screen">
-        <div id="r-code" style="font-size: 36px; font-weight: 900; color: var(--accent); margin-bottom: 25px; letter-spacing: 2px;">------</div>
-        <div id="players-list" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
-            <div class="player-badge"><span>👤 Игрок 1</span><span id="p1">...</span></div>
-            <div class="player-badge"><span>👤 Игрок 2</span><span id="p2">Ожидание...</span></div>
-        </div>
-        <button id="start-btn" style="display:none; margin-top: 30px;" onclick="start()">Начать игру</button>
-        <button class="secondary-btn" style="margin-top: 10px;" onclick="location.reload()">Выйти</button>
+        <h1 id="r-code" style="color:var(--accent)">------</h1>
+        <div id="p-list">Ожидание игроков...</div>
+        <button id="start-btn" style="display:none" onclick="socket.emit('startGame', curRoom)">Начать игру</button>
+        <button style="background:#ef4444" onclick="leave()">Выйти</button>
     </div>
 
     <div id="sc-game" class="screen">
-        <div id="game-status" style="margin-bottom: 20px; font-weight: bold; text-transform: uppercase;">Ожидание...</div>
-        <div id="m-area" style="display:none; width:100%; text-align:center">
-            <input type="text" id="s-word" maxlength="5" placeholder="Слово из 5 букв">
-            <button onclick="sendS()">Загадать</button>
-        </div>
+        <div id="master-word" class="secret-view" style="display:none">СЛОВО: -----</div>
+        <div id="game-status"></div>
         <div id="board"></div>
-        <div id="post-game" style="display:none; width:92%">
-            <button onclick="location.reload()">В главное меню</button>
+        <div id="keyboard"></div>
+        <div id="m-area" style="display:none; width:100%; text-align:center">
+            <input type="text" id="s-word" maxlength="5" placeholder="Загадайте слово">
+            <button onclick="sendS()">ОК</button>
         </div>
+        <button id="back-btn" style="display:none" onclick="location.reload()">В меню</button>
     </div>
 
     <script>
         const socket = io("https://worldle-rcee.onrender.com");
-        let curRoom = "", myRole = "", curRow = 0, curTile = 0, gameActive = false;
+        let curRoom = "", myRole = "", curRow = 0, curTile = 0, gameActive = false, secretWord = "";
+        const soloWords = ["АРБУЗ", "БАНАН", "ПОЕЗД", "ОКЕАН", "ЭКРАН", "КНИГА", "РУЧКА"];
 
-        const RANKS = ["Silver I", "Silver Elite", "Gold Nova I", "Gold Nova Master", "Master Guardian", "Global Elite"];
-        let stats = JSON.parse(localStorage.getItem('artikStats')) || { name: 'Player', score: 0, theme: 'light' };
+        function create() { socket.emit('createRoom', { name: "Игрок" }); }
+        function join() { curRoom = document.getElementById('code-in').value.toUpperCase(); socket.emit('joinRoom', { code: curRoom, name: "Гость" }); show('sc-lobby'); }
+        function leave() { socket.emit('leaveRoom', curRoom); location.reload(); }
+        function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 
-        function updateUI() {
-            document.getElementById('stat-nick').innerText = stats.name;
-            const rankIdx = Math.min(Math.floor(stats.score / 1000), RANKS.length - 1);
-            const xpPercent = (stats.score % 1000) / 10;
-            
-            document.getElementById('rank-name').innerText = RANKS[rankIdx];
-            document.getElementById('xp-bar').style.width = xpPercent + "%";
-            document.body.setAttribute('data-theme', stats.theme);
-            document.querySelector('.theme-toggle').innerText = stats.theme === 'light' ? '🌙' : '☀️';
-            localStorage.setItem('artikStats', JSON.stringify(stats));
-        }
-        updateUI();
-
-        function changeNick() {
-            const newNick = prompt("Введите ваш никнейм:", stats.name);
-            if (newNick && newNick.trim().length > 0) {
-                stats.name = newNick.trim().substring(0, 12);
-                updateUI();
-            }
-        }
-
-        function toggleTheme() {
-            stats.theme = stats.theme === 'light' ? 'dark' : 'light';
-            updateUI();
-        }
-
-        function show(id) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
-
-        function create() { socket.emit('createRoom', { name: stats.name }); }
-        
-        function join() {
-            const code = document.getElementById('code-in').value.toUpperCase();
-            if(!code) return alert("Введите код!");
-            curRoom = code;
-            socket.emit('joinRoom', { code: curRoom, name: stats.name });
-            show('sc-lobby');
-            document.getElementById('r-code').innerText = curRoom;
-        }
-
-        function start() { socket.emit('startGame', curRoom); }
-
-        socket.on('roomCreated', d => {
-            curRoom = d.code;
-            document.getElementById('r-code').innerText = d.code;
-            document.getElementById('start-btn').style.display = 'block';
-            show('sc-lobby');
-        });
-
-        socket.on('playerJoined', ps => {
-            document.getElementById('p1').innerText = ps[0]?.name || "...";
-            document.getElementById('p2').innerText = ps[1]?.name || "Ожидание...";
-        });
+        socket.on('roomCreated', d => { curRoom = d.code; document.getElementById('r-code').innerText = d.code; document.getElementById('start-btn').style.display = 'block'; show('sc-lobby'); });
+        socket.on('playerJoined', ps => { document.getElementById('p-list').innerText = ps.map(p => "👤 " + p.name).join("\n"); });
+        socket.on('roomClosed', () => { alert("Лобби закрыто хостом"); location.reload(); });
 
         socket.on('initRole', d => {
             myRole = d.role; show('sc-game');
-            document.getElementById('game-status').innerText = myRole === 'master' ? "Загадайте слово" : "Ожидание слова...";
-            document.getElementById('m-area').style.display = myRole === 'master' ? 'block' : 'none';
-            initBoard();
+            if(myRole === 'master') {
+                document.getElementById('m-area').style.display = 'block';
+                document.getElementById('game-status').innerText = "Загадайте слово оппоненту";
+            } else {
+                document.getElementById('game-status').innerText = "Ждем слово от мастера...";
+            }
+            initBoard(); initKeyboard();
         });
 
         function sendS() {
@@ -171,17 +91,24 @@
             if(w.length === 5) {
                 socket.emit('setSecretWord', { code: curRoom, word: w });
                 document.getElementById('m-area').style.display = 'none';
-                document.getElementById('game-status').innerText = "Оппонент отгадывает";
+                document.getElementById('master-word').innerText = "СЛОВО: " + w;
+                document.getElementById('master-word').style.display = 'block';
+                document.getElementById('game-status').innerText = "Оппонент отгадывает...";
             }
         }
 
-        socket.on('wordIsReady', () => {
+        socket.on('wordIsReady', (d) => {
             if(myRole === 'guesser') {
-                gameActive = true;
-                document.getElementById('game-status').innerText = "Ваш ход!";
-                window.addEventListener('keydown', handleInput);
+                secretWord = d.word; gameActive = true;
+                document.getElementById('game-status').innerText = "ОТГАДЫВАЙТЕ!";
             }
         });
+
+        function startSolo() {
+            myRole = 'guesser'; secretWord = soloWords[Math.floor(Math.random()*soloWords.length)];
+            show('sc-game'); initBoard(); initKeyboard(); gameActive = true;
+            document.getElementById('game-status').innerText = "ОДИНОЧНЫЙ РЕЖИМ";
+        }
 
         function initBoard() {
             const b = document.getElementById('board'); b.innerHTML = '';
@@ -194,42 +121,70 @@
             }
         }
 
+        function initKeyboard() {
+            const keys = [['Й','Ц','У','К','Е','Н','Г','Ш','Щ','З','Х','Ъ'],['Ф','Ы','В','А','П','Р','О','Л','Д','Ж','Э'],['ВВОД','Я','Ч','С','М','И','Т','Ь','Б','Ю','⌫']];
+            const kb = document.getElementById('keyboard'); kb.innerHTML = '';
+            keys.forEach(row => {
+                const r = document.createElement('div'); r.className = 'k-row';
+                row.forEach(k => {
+                    const b = document.createElement('button'); b.className = 'key'; b.innerText = k; b.id = 'key-'+k;
+                    b.onclick = () => handleInput({key: k === '⌫' ? 'Backspace' : k === 'ВВОД' ? 'Enter' : k});
+                    r.appendChild(b);
+                });
+                kb.appendChild(r);
+            });
+        }
+
         function handleInput(e) {
             if(!gameActive) return;
-            const tile = document.getElementById(`t-${curRow}-${curTile}`);
-            if(e.key === 'Enter' && curTile === 5) {
-                let guess = "";
-                for(let i=0; i<5; i++) guess += document.getElementById(`t-${curRow}-${i}`).innerText;
-                socket.emit('submitGuess', { code: curRoom, guess });
+            const k = e.key.toUpperCase();
+            if(k === 'ENTER' && curTile === 5) {
+                let g = "";
+                for(let i=0; i<5; i++) g += document.getElementById(`t-${curRow}-${i}`).innerText;
+                if(curRoom) socket.emit('submitGuess', { code: curRoom, guess: g });
+                else checkSolo(g);
                 gameActive = false;
-            } else if(e.key === 'Backspace' && curTile > 0) {
-                curTile--;
-                const t = document.getElementById(`t-${curRow}-${curTile}`);
-                t.innerText = "";
-                curTile = Math.max(0, curTile);
-            } else if(curTile < 5 && e.key.length === 1 && /[а-яА-ЯёЁa-zA-Z]/.test(e.key)) {
-                tile.innerText = e.key.toUpperCase();
-                curTile++;
+            } else if(k === 'BACKSPACE' && curTile > 0) {
+                curTile--; document.getElementById(`t-${curRow}-${curTile}`).innerText = "";
+            } else if(curTile < 5 && k.length === 1 && /[А-ЯЁ]/.test(k)) {
+                document.getElementById(`t-${curRow}-${curTile}`).innerText = k; curTile++;
             }
+        }
+
+        function updateKey(letter, state) {
+            const btn = document.getElementById('key-'+letter);
+            if(!btn) return;
+            if(state === 'correct') btn.className = 'key correct';
+            else if(state === 'present' && !btn.classList.contains('correct')) btn.className = 'key present';
+            else if(state === 'absent' && !btn.classList.contains('correct') && !btn.classList.contains('present')) btn.className = 'key absent';
         }
 
         socket.on('guessResult', d => {
             d.states.forEach((s, i) => {
                 const t = document.getElementById(`t-${curRow}-${i}`);
-                t.classList.add(s);
+                t.classList.add(s); updateKey(d.guess[i], s);
             });
-
-            if(d.isWin) {
-                document.getElementById('game-status').innerText = "Победа! +150 XP";
-                if(myRole === 'guesser' && socket.id === d.senderId) { stats.score += 150; updateUI(); }
-                document.getElementById('post-game').style.display = 'block';
-            } else if(curRow >= 5) {
-                document.getElementById('game-status').innerText = "Поражение";
-                document.getElementById('post-game').style.display = 'block';
-            } else {
-                curRow++; curTile = 0; if(myRole === 'guesser') gameActive = true;
-            }
+            if(d.isWin || curRow >= 5) end(d.isWin);
+            else { curRow++; curTile = 0; if(myRole === 'guesser') gameActive = true; }
         });
+
+        function checkSolo(g) {
+            const states = Array(5).fill('absent');
+            const sArr = secretWord.split('');
+            g.split('').forEach((c, i) => { if(c === sArr[i]) { states[i] = 'correct'; sArr[i] = null; } });
+            g.split('').forEach((c, i) => { if(states[i] !== 'correct' && sArr.includes(c)) { states[i] = 'present'; sArr[sArr.indexOf(c)] = null; } });
+            states.forEach((s, i) => { document.getElementById(`t-${curRow}-${i}`).classList.add(s); updateKey(g[i], s); });
+            if(g === secretWord || curRow >= 5) end(g === secretWord);
+            else { curRow++; curTile = 0; gameActive = true; }
+        }
+
+        function end(win) {
+            gameActive = false;
+            document.getElementById('game-status').innerText = win ? "ПОБЕДА!" : "ПРОИГРЫШ. СЛОВО: " + (secretWord || "???");
+            document.getElementById('back-btn').style.display = 'block';
+        }
+
+        window.addEventListener('keydown', handleInput);
     </script>
 </body>
 </html>
